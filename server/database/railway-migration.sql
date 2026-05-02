@@ -180,10 +180,10 @@ CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 -- 13. Insert default staff users if not exists
 -- Admin password: FoodZone2024!
 INSERT INTO staff (username, password_hash, full_name, role, is_active) 
-VALUES ('admin', '$2b$10$kBdrwDTQptt1D2jdHs/aWu/OSaXBIM47dj3.6CuTxRPEyqLci3r2.', 'Administrator', 'Admin', true)
+VALUES ('admin', '$2b$10$kBdrwDTQptt1D2jdHs/aWu/OSaXBIM47dj3.6CuTxRPEyqLci3r2.', 'Administrator', 'Manager', true)
 ON CONFLICT (username) DO UPDATE SET 
     password_hash = EXCLUDED.password_hash,
-    role = EXCLUDED.role,
+    role = 'Manager',
     is_active = EXCLUDED.is_active;
 
 -- Manager password: Manager2024!

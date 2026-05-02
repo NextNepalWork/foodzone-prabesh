@@ -8,6 +8,13 @@ const Header = React.memo(() => {
   const [isScrolled, setIsScrolled] = useState(false);
   const restaurantInfo = useRestaurantInfo();
   
+  // CRITICAL: Never render on admin, staff, or reception pages
+  if (location.pathname.startsWith('/admin') || 
+      location.pathname.startsWith('/staff') || 
+      location.pathname.startsWith('/reception')) {
+    return null;
+  }
+  
   // Memoize page type calculations to prevent re-renders
   const pageInfo = useMemo(() => {
     const path = location.pathname;

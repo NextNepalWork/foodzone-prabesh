@@ -9,9 +9,15 @@ const FloatingCart = () => {
   const { currentTable, cartItems, getTotalPrice } = useCart();
   const { deliveryCartItems, getDeliveryTotalPrice } = useDeliveryCart();
   
-  // Don't show on admin page, delivery cart page, or table pages
-  if (location.pathname === '/admin' || 
-      location.pathname === '/delivery-cart') {
+  // CRITICAL: Never render on admin, staff, or reception pages
+  if (location.pathname.startsWith('/admin') || 
+      location.pathname.startsWith('/staff') || 
+      location.pathname.startsWith('/reception')) {
+    return null;
+  }
+  
+  // Don't show on delivery cart page or table pages
+  if (location.pathname === '/delivery-cart') {
     return null;
   }
   
