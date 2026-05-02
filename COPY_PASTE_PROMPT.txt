@@ -1,0 +1,64 @@
+I need you to perform a complete system audit and fix all integration issues in this restaurant management system.
+
+SYSTEM: Node.js + Express + PostgreSQL + React + Socket.io
+
+YOUR MISSION:
+Ensure perfect synchronization, zero duplications, and complete integration across all modules (Orders, Tables, Daybook, Payments, Reports).
+
+CRITICAL ISSUES TO FIX:
+1. Duplicate daybook entries for same order
+2. Table status not updating in real-time
+3. Payment method constraints rejecting QR payments (esewa, khalti, fonepay)
+4. NULL customer data causing crashes
+5. Order total calculation inconsistencies
+6. Socket.io reconnection issues
+7. Reports showing static/incorrect data
+8. Session management problems
+
+KEY DATA FLOW TO VERIFY:
+Customer Order → Database → Socket Emit → Kitchen/Admin Update → Status Change → Payment → Daybook Entry → Reports Update
+
+AREAS TO AUDIT:
+1. Authentication & Authorization (login, tokens, sessions, roles)
+2. Orders Management (create, update, complete, dine-in/delivery/takeaway)
+3. Tables Management (status, clearing, sessions, real-time updates)
+4. Daybook & Financial Tracking (NO DUPLICATES, all payment types, sync)
+5. Payment QR System (receipt upload, verification, integration)
+6. Reports & Analytics (REAL data, accurate calculations, NULL handling)
+7. Real-time Communication (Socket.io events, synchronization)
+8. Database Integrity (foreign keys, constraints, no orphans)
+
+SUCCESS CRITERIA:
+✓ Zero duplications (orders, daybook, customers, payments)
+✓ Complete real-time synchronization across all clients
+✓ Data integrity maintained (valid foreign keys, no orphans)
+✓ Smooth user experience (no errors, fast, clear feedback)
+✓ Robust error handling (graceful degradation, clear messages)
+
+CRITICAL FILES:
+- server/server.js (main server, ~4300 lines)
+- server/routes/paymentQR.js (QR payment system)
+- server/routes/reports.js (analytics)
+- client/src/pages/AdminPremium.js (main admin dashboard)
+- client/src/components/premium/OrdersManagement.js
+- client/src/components/Daybook.js
+- create-local-database.sql (schema)
+
+EXECUTION:
+1. Read all code to understand architecture
+2. Identify issues (duplications, sync problems, bugs)
+3. Fix critical issues first (order→payment→daybook flow)
+4. Test end-to-end flows
+5. Verify real-time updates work
+6. Document all changes
+
+DELIVERABLES:
+1. List of issues found with severity
+2. Code fixes implemented
+3. Testing results
+4. Updated documentation
+5. Recommendations for improvements
+
+MAKE THIS SYSTEM PRODUCTION-READY AND BULLETPROOF!
+
+Start by reading the codebase and identifying all integration points and potential issues.

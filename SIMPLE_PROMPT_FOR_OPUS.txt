@@ -1,0 +1,29 @@
+alRedesign the admin dashboard UI in client/src/pages/AdminPremium.js to look professional, premium, and modern for desktop web view.
+
+CURRENT SETUP:
+- React 18.2.0 + Tailwind CSS 3.3.3
+- Socket.IO for real-time updates
+- Backend API at http://localhost:3000
+
+FEATURES TO INCLUDE:
+- Dashboard with metrics and charts
+- Real-time order management (Kanban or table view)
+- Table status grid (25 tables)
+- Menu management (items + categories)
+- Customer list
+- Analytics/reports
+- Settings
+
+REQUIREMENTS:
+- Make it look like a premium SaaS dashboard (think Stripe, Vercel, Linear)
+- Smooth animations and transitions
+- Real-time updates via Socket.IO
+- Use existing apiService from '../services/apiService'
+- Desktop-first responsive design
+- Clean, modern, professional aesthetic
+
+AUTHENTICATION:
+- Username: admin, Password: FoodZone2024!
+- Token in localStorage as 'adminToken'
+
+Make it stunning and user-friendly. Use your best judgment for layout, colors, components, and interactions. Deliver production-ready code with proper error handling and loading states.

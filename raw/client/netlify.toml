@@ -1,0 +1,40 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+  functions = "functions"
+
+[build.environment]
+  NODE_VERSION = "18.0.0"
+  NPM_VERSION = "9.0.0"
+  REACT_APP_API_URL = "https://food-zone-backend-l00k.onrender.com"
+  REACT_APP_SOCKET_URL = "https://food-zone-backend-l00k.onrender.com"
+  REACT_APP_GOOGLE_MAPS_API_KEY = "your_google_maps_api_key_here"  # Replace with your actual Google Maps API key
+
+# Handle client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Static assets headers
+[[headers]]
+  for = "/static/js/*"
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/static/css/*"
+  [headers.values]
+    Content-Type = "text/css"
+    Cache-Control = "public, max-age=31536000"
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://food-zone-backend-l00k.onrender.com https://maps.googleapis.com wss://food-zone-backend-l00k.onrender.com;"

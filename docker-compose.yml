@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: foodzone_postgres
+    environment:
+      POSTGRES_DB: foodzone_db
+      POSTGRES_USER: foodzone_user
+      POSTGRES_PASSWORD: foodzone_password_2024
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodzone_user -d foodzone_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: foodzone_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@foodzone.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:

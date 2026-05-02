@@ -1,0 +1,775 @@
+const express = require('express');
+const router = express.Router();
+const { query } = require('../database/config');
+const { authenticateToken } = require('../middleware/auth');
+
+// Helper to parse date range
+const parseDateRange = (range, from, to) => {
+  // If custom from/to dates are provided, use them
+  if (from && to) {
+    return { startDate: from, endDate: to };
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Start of today
+  let startDate, endDate = today;
+  
+  switch(range) {
+    case 'today':
+      startDate = today;
+      break;
+    case 'yesterday':
+      startDate = new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000);
+      endDate = new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000);
+      break;
+    case '7d':
+      startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case '30d':
+      startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+    case '90d':
+      startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+      break;
+    case 'month':
+      // This month - from 1st to today
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      break;
+    case 'lastmonth':
+      // Last month - from 1st to last day of previous month
+      startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+      break;
+    case 'year':
+      // Year to date - from Jan 1 to today
+      startDate = new Date(today.getFullYear(), 0, 1);
+      break;
+    case 'all':
+      // All time - from 2020-01-01 to today
+      startDate = new Date(2020, 0, 1);
+      break;
+    default:
+      // Default to last 30 days
+      startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  }
+  
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0]
+  };
+};
+
+// Overview stats
+router.get('/overview', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range, from, to);
+    
+    const result = await query(`
+      SELECT 
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total), 0) as total_revenue,
+        COALESCE(AVG(total), 0) as avg_order_value,
+        COUNT(DISTINCT customer_id) as unique_customers,
+        COALESCE(SUM(CASE WHEN order_type = 'dine-in' THEN total ELSE 0 END), 0) as dine_in_revenue,
+        COALESCE(SUM(CASE WHEN order_type = 'delivery' THEN total ELSE 0 END), 0) as delivery_revenue
+      FROM orders
+      WHERE payment_status = 'paid'
+        AND created_at::date BETWEEN $1 AND $2
+    `, [startDate, endDate]);
+    
+    const data = result.rows[0];
+    res.json({
+      kpis: {
+        totalRevenue: { value: data.total_revenue, change: 0 },
+        totalOrders: { value: data.total_orders, change: 0 },
+        avgOrderValue: { value: data.avg_order_value, change: 0 },
+        uniqueCustomers: { value: data.unique_customers, change: 0 },
+        dineInRevenue: { value: data.dine_in_revenue, change: 0 },
+        deliveryRevenue: { value: data.delivery_revenue, change: 0 },
+        totalDiscount: { value: 0, change: 0 },
+        completionRate: 100
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching overview:', error);
+    res.status(500).json({ error: 'Failed to fetch overview' });
+  }
+});
+
+// Sales trend
+router.get('/sales-trend', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', granularity = 'day' } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const result = await query(`
+      SELECT 
+        DATE(created_at) as bucket,
+        COUNT(*) as orders,
+        COALESCE(SUM(total), 0) as revenue
+      FROM orders
+      WHERE payment_status = 'paid'
+        AND created_at::date BETWEEN $1 AND $2
+      GROUP BY DATE(created_at)
+      ORDER BY bucket
+    `, [startDate, endDate]);
+    
+    res.json({
+      points: result.rows.map(r => ({
+        bucket: r.bucket,
+        orders: r.orders,
+        revenue: r.revenue
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching sales trend:', error);
+    res.status(500).json({ error: 'Failed to fetch sales trend' });
+  }
+});
+
+// Payment mix
+router.get('/payment-mix', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const result = await query(`
+      SELECT 
+        payment_method as method,
+        COUNT(*) as count,
+        COALESCE(SUM(total), 0) as amount
+      FROM orders
+      WHERE payment_status = 'paid'
+        AND created_at::date BETWEEN $1 AND $2
+      GROUP BY payment_method
+      ORDER BY amount DESC
+    `, [startDate, endDate]);
+    
+    res.json({
+      methods: result.rows.map(r => ({
+        method: r.method || 'Unknown',
+        count: r.count,
+        amount: r.amount
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching payment mix:', error);
+    res.status(500).json({ error: 'Failed to fetch payment mix' });
+  }
+});
+
+// Order type mix
+router.get('/order-type-mix', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const result = await query(`
+      SELECT 
+        order_type as type,
+        COUNT(*) as count,
+        COALESCE(SUM(total), 0) as revenue
+      FROM orders
+      WHERE payment_status = 'paid'
+        AND created_at::date BETWEEN $1 AND $2
+      GROUP BY order_type
+      ORDER BY revenue DESC
+    `, [startDate, endDate]);
+    
+    res.json({
+      types: result.rows.map(r => ({
+        type: r.type || 'Unknown',
+        count: r.count,
+        revenue: r.revenue
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching order type mix:', error);
+    res.status(500).json({ error: 'Failed to fetch order type mix' });
+  }
+});
+
+// Category breakdown
+router.get('/category-breakdown', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const result = await query(`
+      SELECT 
+        m.category,
+        COUNT(oi.id) as items_sold,
+        COALESCE(SUM(oi.quantity * oi.price), 0) as revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      JOIN menu_items m ON oi.menu_item_id = m.id
+      WHERE o.payment_status = 'paid'
+        AND o.created_at::date BETWEEN $1 AND $2
+      GROUP BY m.category
+      ORDER BY revenue DESC
+    `, [startDate, endDate]);
+    
+    res.json({
+      categories: result.rows.map(r => ({
+        category: r.category || 'Uncategorized',
+        items_sold: r.items_sold,
+        revenue: r.revenue
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching category breakdown:', error);
+    res.status(500).json({ error: 'Failed to fetch category breakdown' });
+  }
+});
+
+// Top items
+router.get('/top-items', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', metric = 'revenue', limit = 30 } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const orderBy = metric === 'quantity' ? 'total_quantity' : 'revenue';
+    
+    const result = await query(`
+      SELECT 
+        m.name,
+        m.category,
+        SUM(oi.quantity) as total_quantity,
+        COALESCE(SUM(oi.quantity * oi.price), 0) as revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      JOIN menu_items m ON oi.menu_item_id = m.id
+      WHERE o.payment_status = 'paid'
+        AND o.created_at::date BETWEEN $1 AND $2
+      GROUP BY m.id, m.name, m.category
+      ORDER BY ${orderBy} DESC
+      LIMIT $3
+    `, [startDate, endDate, parseInt(limit)]);
+    
+    res.json({
+      items: result.rows.map(r => ({
+        name: r.name,
+        category: r.category,
+        quantity: r.total_quantity,
+        revenue: r.revenue
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching top items:', error);
+    res.status(500).json({ error: 'Failed to fetch top items' });
+  }
+});
+
+// Hourly load
+router.get('/hourly-load', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const result = await query(`
+      SELECT 
+        EXTRACT(HOUR FROM created_at) as hour,
+        COUNT(*) as orders,
+        COALESCE(SUM(total), 0) as revenue
+      FROM orders
+      WHERE payment_status = 'paid'
+        AND created_at::date BETWEEN $1 AND $2
+      GROUP BY EXTRACT(HOUR FROM created_at)
+      ORDER BY hour
+    `, [startDate, endDate]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching hourly load:', error);
+    res.status(500).json({ error: 'Failed to fetch hourly load' });
+  }
+});
+
+// Customers report
+router.get('/customers', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', limit = 25 } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    const result = await query(`
+      SELECT 
+        COALESCE(c.name, 'Guest') as name,
+        c.phone,
+        COUNT(o.id) as order_count,
+        COALESCE(SUM(o.total), 0) as total_spent,
+        MAX(o.created_at) as last_order
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.payment_status = 'paid'
+        AND o.created_at::date BETWEEN $1 AND $2
+      GROUP BY COALESCE(c.name, 'Guest'), c.phone
+      ORDER BY total_spent DESC
+      LIMIT $3
+    `, [startDate, endDate, parseInt(limit)]);
+    
+    res.json({
+      top: result.rows.map(r => ({
+        name: r.name,
+        phone: r.phone || 'N/A',
+        order_count: r.order_count,
+        total_spent: r.total_spent,
+        last_order: r.last_order
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    res.status(500).json({ error: 'Failed to fetch customers' });
+  }
+});
+
+// Check data availability
+router.get('/data-check', authenticateToken, async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT 
+        COUNT(*) as total_orders,
+        COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid_orders,
+        COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as pending_orders,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN total ELSE 0 END), 0) as total_revenue
+      FROM orders
+    `);
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error checking data:', error);
+    res.status(500).json({ error: 'Failed to check data' });
+  }
+});
+
+// Hourly/weekday order heatmap — day-of-week × hour counts.
+router.get('/heatmap', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      SELECT EXTRACT(DOW FROM created_at)::int  AS dow,
+             EXTRACT(HOUR FROM created_at)::int AS hour,
+             COUNT(*)::int                      AS orders,
+             COALESCE(SUM(total), 0)::numeric   AS revenue
+      FROM orders
+      WHERE created_at::date BETWEEN $1 AND $2
+      GROUP BY dow, hour
+      ORDER BY dow, hour
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching heatmap:', error);
+    res.status(500).json({ error: 'Failed to fetch heatmap' });
+  }
+});
+
+// Slow-moving menu items: least-ordered items in range.
+router.get('/slow-movers', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', limit = 20 } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      SELECT mi.id, mi.name, mi.category,
+             COALESCE(SUM(oi.quantity), 0)::int                            AS units_sold,
+             COALESCE(SUM(oi.quantity * oi.price), 0)::numeric             AS revenue
+      FROM menu_items mi
+      LEFT JOIN order_items oi ON oi.menu_item_name = mi.name
+      LEFT JOIN orders o       ON o.id = oi.order_id
+                               AND o.created_at::date BETWEEN $1 AND $2
+      GROUP BY mi.id, mi.name, mi.category
+      ORDER BY units_sold ASC, mi.name ASC
+      LIMIT $3
+    `, [startDate, endDate, Number(limit)]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching slow-movers:', error);
+    res.status(500).json({ error: 'Failed to fetch slow-movers' });
+  }
+});
+
+// Profit & Loss: revenue from paid orders minus expenses from daybook.
+router.get('/profit-loss', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+
+    const revenueR = await query(`
+      SELECT COALESCE(SUM(total), 0)::numeric AS revenue
+      FROM orders
+      WHERE payment_status = 'paid' AND created_at::date BETWEEN $1 AND $2
+    `, [startDate, endDate]);
+
+    const expR = await query(`
+      SELECT COALESCE(SUM(amount), 0)::numeric AS total
+      FROM daybook_transactions
+      WHERE transaction_type = 'expense' AND transaction_date BETWEEN $1 AND $2
+    `, [startDate, endDate]);
+
+    const revenue = Number(revenueR.rows[0].revenue);
+    const expenses = Number(expR.rows[0].total);
+    const cogs = 0; // TODO: derive from recipe_ingredients once costed
+    const gross_profit = revenue - cogs;
+    const net_profit = gross_profit - expenses;
+    res.json({ revenue, cogs, gross_profit, expenses, net_profit });
+  } catch (error) {
+    console.error('Error fetching profit-loss:', error);
+    res.status(500).json({ error: 'Failed to fetch profit-loss' });
+  }
+});
+
+router.get('/profit-loss-trend', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      WITH daily_rev AS (
+        SELECT DATE(created_at) AS d, COALESCE(SUM(total), 0)::numeric AS revenue
+        FROM orders
+        WHERE payment_status = 'paid' AND created_at::date BETWEEN $1 AND $2
+        GROUP BY DATE(created_at)
+      ),
+      daily_exp AS (
+        SELECT transaction_date AS d, COALESCE(SUM(amount), 0)::numeric AS expenses
+        FROM daybook_transactions
+        WHERE transaction_type = 'expense' AND transaction_date BETWEEN $1 AND $2
+        GROUP BY transaction_date
+      )
+      SELECT COALESCE(r.d, e.d) AS bucket,
+             COALESCE(r.revenue, 0) AS revenue,
+             COALESCE(e.expenses, 0) AS expenses,
+             COALESCE(r.revenue, 0) - COALESCE(e.expenses, 0) AS net_profit
+      FROM daily_rev r
+      FULL OUTER JOIN daily_exp e ON r.d = e.d
+      ORDER BY bucket
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching profit-loss trend:', error);
+    res.status(500).json({ error: 'Failed to fetch profit-loss trend' });
+  }
+});
+
+// Get expenses from daybook_transactions
+router.get('/expenses', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      SELECT 
+        id, 
+        transaction_date as expense_date, 
+        category, 
+        description, 
+        amount, 
+        payment_method, 
+        reference as reference_number,
+        created_by,
+        created_at
+      FROM daybook_transactions
+      WHERE transaction_type = 'expense'
+        AND transaction_date BETWEEN $1 AND $2
+      ORDER BY transaction_date DESC, id DESC
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching expenses:', error);
+    res.json([]);
+  }
+});
+
+// Add new expense to daybook
+router.post('/expenses', authenticateToken, async (req, res) => {
+  try {
+    const {
+      expense_date, category, description, amount,
+      payment_method, reference_number, notes
+    } = req.body;
+
+    if (!category || !amount) {
+      return res.status(400).json({ error: 'category and amount are required' });
+    }
+
+    const txDate = expense_date || new Date().toISOString().split('T')[0];
+    const fullDescription = notes ? `${description || ''} - ${notes}` : description;
+
+    const result = await query(`
+      INSERT INTO daybook_transactions
+        (transaction_date, transaction_type, category, amount, description, payment_method, reference, created_by, created_at)
+      VALUES ($1, 'expense', $2, $3, $4, $5, $6, $7, NOW())
+      RETURNING *
+    `, [
+      txDate,
+      category,
+      Number(amount),
+      fullDescription || null,
+      payment_method || null,
+      reference_number || null,
+      req.user?.username || null
+    ]);
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating expense:', error);
+    res.status(500).json({ error: 'Failed to create expense', details: error.message });
+  }
+});
+
+// Update expense in daybook
+router.put('/expenses/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      expense_date, category, description, amount,
+      payment_method, reference_number, notes
+    } = req.body;
+
+    const fullDescription = notes ? `${description || ''} - ${notes}` : description;
+
+    const result = await query(`
+      UPDATE daybook_transactions
+      SET 
+        transaction_date = COALESCE($1, transaction_date),
+        category = COALESCE($2, category),
+        amount = COALESCE($3, amount),
+        description = COALESCE($4, description),
+        payment_method = COALESCE($5, payment_method),
+        reference = COALESCE($6, reference),
+        updated_at = NOW()
+      WHERE id = $7 AND transaction_type = 'expense'
+      RETURNING *
+    `, [
+      expense_date || null,
+      category || null,
+      amount ? Number(amount) : null,
+      fullDescription || null,
+      payment_method || null,
+      reference_number || null,
+      id
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating expense:', error);
+    res.status(500).json({ error: 'Failed to update expense', details: error.message });
+  }
+});
+
+// Delete expense from daybook
+router.delete('/expenses/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(`
+      DELETE FROM daybook_transactions
+      WHERE id = $1 AND transaction_type = 'expense'
+      RETURNING id
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('Error deleting expense:', error);
+    res.status(500).json({ error: 'Failed to delete expense', details: error.message });
+  }
+});
+
+// Get expense categories with totals from daybook
+router.get('/expense-categories', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      SELECT 
+        category, 
+        COUNT(*)::int AS count, 
+        COALESCE(SUM(amount), 0)::numeric AS total
+      FROM daybook_transactions
+      WHERE transaction_type = 'expense'
+        AND transaction_date BETWEEN $1 AND $2
+      GROUP BY category
+      ORDER BY total DESC
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching expense categories:', error);
+    res.json([]);
+  }
+});
+
+router.get('/staff-activity', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    // Daybook transactions carry created_by for many action endpoints.
+    const result = await query(`
+      SELECT COALESCE(created_by, 'system') AS staff,
+             COUNT(*)::int                   AS actions,
+             COALESCE(SUM(amount), 0)::numeric AS total_amount
+      FROM daybook_transactions
+      WHERE transaction_date BETWEEN $1 AND $2
+      GROUP BY COALESCE(created_by, 'system')
+      ORDER BY actions DESC
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching staff activity:', error);
+    res.json([]);
+  }
+});
+
+router.get('/discounts', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      SELECT DATE(created_at) AS bucket,
+             COUNT(*) FILTER (WHERE COALESCE(discount, 0) > 0)::int AS orders_with_discount,
+             COALESCE(SUM(discount), 0)::numeric                    AS total_discount
+      FROM orders
+      WHERE created_at::date BETWEEN $1 AND $2
+      GROUP BY DATE(created_at)
+      ORDER BY bucket
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching discounts:', error);
+    res.json([]);
+  }
+});
+
+router.get('/table-performance', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', from, to } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    const result = await query(`
+      SELECT table_id,
+             COUNT(*)::int                     AS orders,
+             COALESCE(SUM(total), 0)::numeric  AS revenue,
+             COALESCE(AVG(total), 0)::numeric  AS avg_ticket
+      FROM orders
+      WHERE order_type = 'dine-in'
+        AND table_id IS NOT NULL
+        AND created_at::date BETWEEN $1 AND $2
+      GROUP BY table_id
+      ORDER BY revenue DESC
+    `, [startDate, endDate]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching table performance:', error);
+    res.json([]);
+  }
+});
+
+router.get('/inventory-valuation', authenticateToken, async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT id, name, unit,
+             COALESCE(current_stock, 0)::numeric AS stock,
+             COALESCE(cost_per_unit, 0)::numeric AS unit_cost,
+             (COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0))::numeric AS value
+      FROM ingredients
+      WHERE is_active IS NOT FALSE
+      ORDER BY value DESC
+    `);
+    const total_value = result.rows.reduce((s, r) => s + Number(r.value || 0), 0);
+    res.json({ enabled: true, total_value, items: result.rows });
+  } catch (error) {
+    console.error('Error fetching inventory valuation:', error);
+    res.json({ enabled: false, total_value: 0, items: [] });
+  }
+});
+
+// Export data as CSV
+router.get('/export', authenticateToken, async (req, res) => {
+  try {
+    const { range = '30d', type = 'orders' } = req.query;
+    const { startDate, endDate } = parseDateRange(range);
+    
+    let data, filename, headers;
+    
+    switch (type) {
+      case 'orders':
+        const orders = await query(`
+          SELECT 
+            o.id, o.order_number, o.order_type, o.table_id,
+            o.total, o.payment_method, o.payment_status,
+            o.created_at, COALESCE(c.name, 'Guest') as customer_name
+          FROM orders o
+          LEFT JOIN customers c ON o.customer_id = c.id
+          WHERE o.created_at::date BETWEEN $1 AND $2
+          ORDER BY o.created_at DESC
+        `, [startDate, endDate]);
+        data = orders.rows;
+        filename = `orders_${startDate}_${endDate}.csv`;
+        headers = ['ID', 'Order Number', 'Type', 'Table', 'Total', 'Payment Method', 'Status', 'Date', 'Customer'];
+        break;
+        
+      case 'expenses':
+        const expenses = await query(`
+          SELECT 
+            id, transaction_date as expense_date, category, 
+            description, amount, payment_method, reference, created_by
+          FROM daybook_transactions
+          WHERE transaction_type = 'expense'
+            AND transaction_date BETWEEN $1 AND $2
+          ORDER BY transaction_date DESC
+        `, [startDate, endDate]);
+        data = expenses.rows;
+        filename = `expenses_${startDate}_${endDate}.csv`;
+        headers = ['ID', 'Date', 'Category', 'Description', 'Amount', 'Payment Method', 'Reference', 'Created By'];
+        break;
+        
+      case 'sales':
+        const sales = await query(`
+          SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as orders,
+            COALESCE(SUM(total), 0) as revenue,
+            COALESCE(AVG(total), 0) as avg_order_value
+          FROM orders
+          WHERE payment_status = 'paid'
+            AND created_at::date BETWEEN $1 AND $2
+          GROUP BY DATE(created_at)
+          ORDER BY date
+        `, [startDate, endDate]);
+        data = sales.rows;
+        filename = `sales_${startDate}_${endDate}.csv`;
+        headers = ['Date', 'Orders', 'Revenue', 'Avg Order Value'];
+        break;
+        
+      default:
+        return res.status(400).json({ error: 'Invalid export type' });
+    }
+    
+    // Generate CSV
+    const csvRows = [headers.join(',')];
+    data.forEach(row => {
+      const values = Object.values(row).map(val => {
+        if (val === null || val === undefined) return '';
+        const str = String(val);
+        return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+      });
+      csvRows.push(values.join(','));
+    });
+    
+    const csv = csvRows.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+    
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    res.status(500).json({ error: 'Failed to export data' });
+  }
+});
+
+module.exports = router;

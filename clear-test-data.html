@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Test Data - Food Zone Admin</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .warning h3 {
+            margin-top: 0;
+            color: #d63031;
+        }
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+        .clear-btn {
+            background: #e74c3c;
+            color: white;
+        }
+        .clear-btn:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        .clear-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status-btn {
+            background: #3498db;
+            color: white;
+        }
+        .status-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .data-list {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .data-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .data-list li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Test Data</h1>
+        
+        <div class="warning">
+            <h3>⚠️ Warning</h3>
+            <p><strong>This action will permanently delete ALL test data from the database:</strong></p>
+            <div class="data-list">
+                <ul>
+                    <li>All orders (dine-in and delivery)</li>
+                    <li>All customers</li>
+                    <li>All table sessions</li>
+                    <li>All payment records</li>
+                    <li>All cached data</li>
+                </ul>
+            </div>
+            <p><strong>This action cannot be undone!</strong></p>
+        </div>
+
+        <div class="info">
+            <h3>ℹ️ What will remain:</h3>
+            <div class="data-list">
+                <ul>
+                    <li>Menu items (all 157+ items will stay)</li>
+                    <li>Database structure and tables</li>
+                    <li>Admin authentication settings</li>
+                    <li>Application configuration</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="status-btn" onclick="checkStatus()">📊 Check Current Data</button>
+            <button class="clear-btn" onclick="clearAllData()" id="clearBtn">🗑️ Clear All Test Data</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing request...</p>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://food-zone-backend-l00k.onrender.com';
+        
+        async function checkStatus() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/api/database/summary`);
+                const data = await response.json();
+                
+                showResult(`
+                    <h3>📊 Current Database Status</h3>
+                    <div class="data-list">
+                        <ul>
+                            <li><strong>Orders:</strong> ${data.orders || 0}</li>
+                            <li><strong>Customers:</strong> ${data.customers || 0}</li>
+                            <li><strong>Menu Items:</strong> ${data.menu_items || 0}</li>
+                            <li><strong>Active Sessions:</strong> ${data.active_sessions || 0}</li>
+                        </ul>
+                    </div>
+                    <p><em>Last updated: ${new Date().toLocaleString()}</em></p>
+                `, 'success');
+            } catch (error) {
+                showResult(`
+                    <h3>❌ Error</h3>
+                    <p>Failed to fetch database status: ${error.message}</p>
+                    <p>Make sure the backend server is running.</p>
+                `, 'error');
+            }
+            showLoading(false);
+        }
+
+        async function clearAllData() {
+            if (!confirm('Are you absolutely sure you want to delete ALL test data? This cannot be undone!')) {
+                return;
+            }
+            
+            if (!confirm('This will delete ALL orders, customers, and sessions. Type YES in the next prompt to confirm.')) {
+                return;
+            }
+            
+            const confirmation = prompt('Type "DELETE ALL DATA" to confirm:');
+            if (confirmation !== 'DELETE ALL DATA') {
+                showResult(`
+                    <h3>❌ Cancelled</h3>
+                    <p>Data clearing cancelled. Confirmation text did not match.</p>
+                `, 'error');
+                return;
+            }
+
+            showLoading(true);
+            document.getElementById('clearBtn').disabled = true;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/clear-all-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult(`
+                        <h3>✅ Success!</h3>
+                        <p>${data.message}</p>
+                        <div class="data-list">
+                            <p><strong>Cleared tables:</strong></p>
+                            <ul>
+                                ${data.cleared.map(table => `<li>${table}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <p><strong>Your restaurant system is now clean and ready for real customers!</strong></p>
+                        <p><em>You can now refresh your admin, staff, and reception dashboards.</em></p>
+                    `, 'success');
+                } else {
+                    throw new Error(data.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                showResult(`
+                    <h3>❌ Error</h3>
+                    <p>Failed to clear data: ${error.message}</p>
+                    <p>Please check the server logs or try again.</p>
+                `, 'error');
+            }
+            
+            showLoading(false);
+            document.getElementById('clearBtn').disabled = false;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showResult(html, type) {
+            const result = document.getElementById('result');
+            result.innerHTML = html;
+            result.className = `result ${type}`;
+            result.style.display = 'block';
+        }
+
+        // Auto-check status on page load
+        window.addEventListener('load', checkStatus);
+    </script>
+</body>
+</html>

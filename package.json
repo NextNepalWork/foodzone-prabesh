@@ -1,0 +1,29 @@
+{
+  "name": "restaurant-ordering-system",
+  "version": "1.0.0",
+  "description": "Full-stack restaurant ordering system with React and Express",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "build": "echo 'Build completed'",
+    "postinstall": "npm install --prefix server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "restaurant",
+    "ordering",
+    "react",
+    "express",
+    "socket.io"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.2.2",
+    "pg": "^8.16.3"
+  }
+}

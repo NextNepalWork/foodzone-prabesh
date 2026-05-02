@@ -1,0 +1,21 @@
+# Food Zone Database Configuration - LOCAL DEVELOPMENT
+DATABASE_URL=postgresql://localhost:5432/foodzone_local
+
+# Server Configuration
+PORT=5001
+NODE_ENV=development
+
+# Restaurant Configuration
+RESTAURANT_NAME="Food Zone Duwakot"
+RESTAURANT_PHONE="9851234567"
+RESTAURANT_ADDRESS="KMC Chowk, Duwakot, Bhaktapur"
+RESTAURANT_LATITUDE=27.6710
+RESTAURANT_LONGITUDE=85.4298
+
+# Delivery Configuration
+DELIVERY_RADIUS=5.0
+MIN_DELIVERY_AMOUNT=200
+BASE_DELIVERY_FEE=50
+
+# CORS Configuration for local development and network access
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://192.168.1.73:3000

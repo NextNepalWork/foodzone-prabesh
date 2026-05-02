@@ -1,0 +1,122 @@
+I need you to completely redesign the admin dashboard UI for my Food Zone restaurant ordering system to make it look professional, premium, and highly user-friendly for desktop/web view.
+
+CURRENT TECH STACK:
+- React 18.2.0 with Tailwind CSS 3.3.3
+- Socket.IO for real-time updates
+- Express.js backend API
+- File to redesign: client/src/pages/AdminPremium.js
+
+DESIGN REQUIREMENTS:
+
+1. VISUAL STYLE:
+- Modern, clean, minimalist aesthetic with premium feel
+- Color palette: Deep blue/purple primary, emerald success, amber warnings, rose danger, slate grays
+- Glass-morphism or neumorphism accents
+- Subtle animations and smooth transitions
+- Dark mode support (optional)
+
+2. LAYOUT:
+- Fixed collapsible left sidebar (280px → 80px)
+- Fixed top header (64px) with breadcrumbs, search, notifications, user menu
+- Main content area with card-based design
+- Navigation: Dashboard, Orders, Tables, Customers, Menu, Payments, Analytics, Staff, Settings
+
+3. DASHBOARD PAGE:
+- 4 metric cards: Total Orders, Revenue, Active Tables, Pending Orders (with trend indicators)
+- Charts: Revenue line chart, order status donut, popular items bar chart, peak hours heatmap
+- Real-time activity feed with timeline layout
+- All cards with hover effects (lift + shadow)
+
+4. ORDERS PAGE:
+- Kanban board view: Pending → Preparing → Ready → Completed
+- Drag-and-drop functionality
+- Order cards showing: number, customer, table, items, total, time elapsed (color-coded)
+- Real-time updates with slide-in animations
+- Alternative table view with sorting/filtering
+
+5. TABLES PAGE:
+- 5x5 grid for 25 tables
+- Status colors: Green (available), Blue (occupied), Amber (reserved), Red (attention)
+- Each card shows: table number, status, order total, time occupied
+- Click for details modal, real-time status updates
+
+6. MENU MANAGEMENT:
+- Left sidebar: categories list
+- Right: items grid with image thumbnails
+- Add/Edit modal with image upload
+- Drag-to-reorder categories
+- Quick toggle for availability
+
+7. ANALYTICS PAGE:
+- Date range selector with presets
+- Key metrics with trends
+- Multiple charts: revenue, orders by category, payment methods, top items
+- Export to PDF/Excel
+
+8. DESIGN PATTERNS:
+- Buttons: Primary (solid), Secondary (outlined), Danger (red), Icon (circular)
+- Forms: Floating labels, inline validation, auto-save indicators
+- Modals: Backdrop blur, slide-in animation, keyboard navigation
+- Tables: Zebra striping, sortable headers, pagination, row actions
+- Cards: 12px border radius, subtle shadow, hover lift effect
+
+9. ANIMATIONS:
+- Page transitions: 300ms fade-in
+- Modals: 200ms slide-in
+- Buttons: Scale 1.02 on hover
+- Loading: Skeleton screens + shimmer effect
+- Real-time updates: Smooth transitions
+
+10. TECHNICAL:
+- Use React hooks for state management
+- Socket.IO integration for real-time (socket.on('newOrder'), socket.on('orderStatusUpdate'))
+- API calls via existing apiService from '../services/apiService'
+- Lazy loading and code splitting
+- React.memo for performance
+- Error boundaries and loading states
+
+AVAILABLE API ENDPOINTS:
+- Orders: GET/POST/PUT/DELETE /api/orders
+- Menu: GET/POST/PUT/DELETE /api/menu
+- Categories: GET/POST/PUT/DELETE /api/categories
+- Tables: GET /api/tables, POST /api/tables/:id/clear
+- Customers: GET /api/customers
+- Payments: GET/POST /api/payments
+- Analytics: GET /api/analytics/revenue, /api/analytics/orders
+- Staff: GET/POST/PUT/DELETE /api/staff
+- Settings: GET/PUT /api/settings
+
+DELIVERABLES:
+1. Complete redesigned AdminPremium.js file with all components
+2. Full implementation of all pages/tabs
+3. Real-time Socket.IO integration
+4. Responsive design (desktop-first, 1366px+)
+5. Smooth animations and transitions
+6. Error handling and loading states
+7. Toast notifications for user feedback
+8. Code comments for complex logic
+
+DESIGN INSPIRATION:
+- Stripe Dashboard (clean, professional)
+- Notion (smooth interactions)
+- Linear (modern, fast)
+- Vercel Dashboard (minimalist)
+
+AUTHENTICATION:
+- Username: admin, Password: FoodZone2024!
+- Token stored in localStorage as 'adminToken'
+- Check auth on mount, redirect if not authenticated
+
+SUCCESS CRITERIA:
+✅ Professional and premium appearance
+✅ Highly intuitive and user-friendly
+✅ Fast loading with smooth animations
+✅ Perfect for desktop/laptop screens
+✅ Seamless real-time updates
+✅ Clear visual feedback for all actions
+✅ Maintainable and well-documented code
+✅ Follows React and Tailwind best practices
+
+Please create a stunning, professional admin dashboard that makes restaurant management delightful. Focus on clean design, smooth interactions, and excellent UX. Make this the best-looking restaurant admin dashboard possible.
+
+Include the complete code with all necessary imports, state management, Socket.IO setup, API integrations, and Tailwind CSS styling. Ensure all components are production-ready with proper error handling and loading states.

@@ -1,0 +1,48 @@
+{
+  "name": "Food Zone Restaurant - Foodzone.com.np",
+  "short_name": "Food Zone",
+  "description": "Food Zone Restaurant PWA - Order online at Foodzone.com.np",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/images/Food Zone Restaurant Logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable any"
+    }
+  ],
+  "start_url": "./staff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "categories": ["food", "business", "productivity"],
+  "scope": "/",
+  "prefer_related_applications": false,
+  "display_override": ["window-controls-overlay", "standalone"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "shortcuts": [
+    {
+      "name": "Admin Console",
+      "short_name": "Admin",
+      "description": "Manage orders, tables and settings",
+      "url": "/admin",
+      "icons": [{ "src": "favicon.ico", "sizes": "192x192" }]
+    },
+    {
+      "name": "Staff Dashboard",
+      "short_name": "Kitchen",
+      "description": "View incoming orders",
+      "url": "/staff",
+      "icons": [{ "src": "favicon.ico", "sizes": "192x192" }]
+    }
+  ],
+  "lang": "en",
+  "dir": "ltr"
+}

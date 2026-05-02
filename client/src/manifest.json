@@ -1,0 +1,63 @@
+{
+  "short_name": "Food Zone Staff",
+  "name": "Food Zone Restaurant Staff Dashboard",
+  "description": "Progressive Web App for Food Zone restaurant staff to manage orders with real-time notifications - Foodzone.com.np",
+  "icons": [
+    {
+      "src": "/images/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/staff",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#f8fafc",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["business", "productivity", "food"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "View Orders",
+      "short_name": "Orders",
+      "description": "View all orders",
+      "url": "/staff?filter=all",
+      "icons": [
+        {
+          "src": "/images/logo.jpg",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Active Orders",
+      "short_name": "Active",
+      "description": "View active orders",
+      "url": "/staff?filter=active",
+      "icons": [
+        {
+          "src": "/images/logo.jpg",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/banner.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide"
+    }
+  ]
+}

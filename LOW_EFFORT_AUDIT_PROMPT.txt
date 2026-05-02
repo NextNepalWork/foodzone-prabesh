@@ -1,0 +1,61 @@
+SYSTEM AUDIT - Restaurant Management System
+
+I need you to audit and fix this restaurant management system. Work systematically through each area.
+
+CRITICAL PROBLEMS TO FIX:
+1. Duplicate daybook entries - same order creates multiple entries
+2. Table status not updating in real-time on floor plan
+3. Database rejects QR payments (esewa, khalti, fonepay) - constraint issue
+4. System crashes when customer_name or customer_phone is NULL
+5. Order totals inconsistent (subtotal vs total vs total_amount fields)
+6. Socket.io stops working after disconnect - no reconnection
+7. Reports show static data instead of real database data
+8. Users get logged out unexpectedly - session issues
+
+CRITICAL DATA FLOW (MUST WORK PERFECTLY):
+Order Created → Payment Processed → Daybook Entry Created → Reports Updated
+(NO DUPLICATES ALLOWED IN DAYBOOK)
+
+AREAS TO CHECK:
+
+1. ORDERS & PAYMENTS
+   - Check: server/server.js (line 780-1200)
+   - Fix: Order creation, payment processing, daybook integration
+   - Ensure: No duplicate daybook entries for same order
+
+2. TABLES & REAL-TIME UPDATES
+   - Check: server/server.js (line 2770-3000)
+   - Fix: Table status updates, Socket.io events
+   - Ensure: Floor plan updates in real-time
+
+3. DAYBOOK SYNC
+   - Check: server/server.js (line 3200-3500)
+   - Fix: Payment sync, constraint issues
+   - Ensure: All payment types allowed (cash, card, esewa, khalti, fonepay)
+
+4. REPORTS
+   - Check: server/routes/reports.js
+   - Fix: SQL queries to pull real data
+   - Ensure: NULL customer data handled gracefully
+
+5. SOCKET.IO
+   - Check: server/server.js (line 4200-4300)
+   - Fix: Event emissions, reconnection logic
+   - Ensure: All clients stay synchronized
+
+WORK PROCESS:
+1. Read the file
+2. Identify the specific issue
+3. Fix it
+4. Move to next issue
+5. Test the critical flow at the end
+
+START WITH: Fixing duplicate daybook entries (most critical)
+
+DELIVERABLES:
+- List of issues found
+- Code fixes made
+- Files modified
+- Testing confirmation
+
+Work through this systematically. Start now.

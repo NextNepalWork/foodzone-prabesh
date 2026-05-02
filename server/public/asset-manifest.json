@@ -1,0 +1,26 @@
+{
+  "files": {
+    "main.css": "./static/css/main.08e5e71d.css",
+    "main.js": "./static/js/main.eb260109.js",
+    "delivery.js": "./static/js/delivery.7651c2b4.chunk.js",
+    "admin.js": "./static/js/admin.b619da6c.chunk.js",
+    "staff.js": "./static/js/staff.a621177a.chunk.js",
+    "table-call.js": "./static/js/table-call.38c080b6.chunk.js",
+    "table-dashboard.css": "./static/css/table-dashboard.cb5735bb.chunk.css",
+    "table-dashboard.js": "./static/js/table-dashboard.04d12b00.chunk.js",
+    "test.js": "./static/js/test.6bb97b0f.chunk.js",
+    "static/js/45.6e95d1a4.chunk.js": "./static/js/45.6e95d1a4.chunk.js",
+    "static/js/399.e219a2db.chunk.js": "./static/js/399.e219a2db.chunk.js",
+    "mobile-admin.css": "./static/css/mobile-admin.ac495641.chunk.css",
+    "mobile-admin.js": "./static/js/mobile-admin.d52aef4e.chunk.js",
+    "static/js/292.06e52aa0.chunk.js": "./static/js/292.06e52aa0.chunk.js",
+    "static/js/539.d3d0795c.chunk.js": "./static/js/539.d3d0795c.chunk.js",
+    "static/js/418.fa0c843a.chunk.js": "./static/js/418.fa0c843a.chunk.js",
+    "static/js/625.691f35f8.chunk.js": "./static/js/625.691f35f8.chunk.js",
+    "index.html": "./index.html"
+  },
+  "entrypoints": [
+    "static/css/main.08e5e71d.css",
+    "static/js/main.eb260109.js"
+  ]
+}

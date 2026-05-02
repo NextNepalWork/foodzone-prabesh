@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(npx eslint *)",
+      "Bash(CI=true timeout 120 npx react-scripts build)",
+      "Bash(npx react-scripts *)",
+      "Bash(npx --no-install eslint --no-eslintrc --parser-options=ecmaVersion:2022,sourceType:module,ecmaFeatures:{jsx:true} src/pages/AdminPremium.js src/components/VoiceCallInterface.js)",
+      "Bash(node --check src/components/premium/InventoryManagement.js)",
+      "Bash(node -e \"require\\('./src/components/premium/InventoryManagement.js'\\)\")",
+      "Bash(CI=true npx --no-install eslint src/components/premium/InventoryManagement.js)",
+      "Bash(CI=true npx --no-install eslint src/components/premium/InventoryManagement.js src/pages/AdminPremium.js)",
+      "Bash(node -c server/server.js)",
+      "Bash(node -c server/routes/paymentQR.js)",
+      "Bash(node -c server/routes/reports.js)",
+      "Bash(node -c server/routes/tableSession.js)",
+      "Bash(npx --no-install --yes -p @babel/parser@^7 -e 'const p=require\\(\"@babel/parser\"\\); const fs=require\\(\"fs\"\\); for \\(const f of [\"client/src/pages/AdminPremium.js\",\"client/src/pages/Admin.js\",\"client/src/components/TableGrid.js\",\"client/src/components/Daybook.js\",\"client/src/components/PaymentQRModal.js\"]\\) { try { p.parse\\(fs.readFileSync\\(f,\"utf8\"\\),{sourceType:\"module\",plugins:[\"jsx\"]}\\); console.log\\(f,\"OK\"\\); } catch\\(e\\){ console.log\\(f,\"FAIL\",e.message\\); } }')",
+      "Bash(node -e 'const p=require\\(\"@babel/parser\"\\); const fs=require\\(\"fs\"\\); for \\(const f of [\"src/pages/AdminPremium.js\",\"src/pages/Admin.js\",\"src/components/TableGrid.js\",\"src/components/Daybook.js\",\"src/components/PaymentQRModal.js\"]\\) { try { p.parse\\(fs.readFileSync\\(f,\"utf8\"\\),{sourceType:\"module\",plugins:[\"jsx\"]}\\); console.log\\(f,\"OK\"\\); } catch\\(e\\){ console.log\\(f,\"FAIL\",e.message\\); } }')",
+      "Bash(node -e 'const p=require\\(\"@babel/parser\"\\); const fs=require\\(\"fs\"\\); for \\(const f of [\"src/pages/AdminPremium.js\",\"src/components/premium/OrdersManagement.js\"]\\) { try { p.parse\\(fs.readFileSync\\(f,\"utf8\"\\),{sourceType:\"module\",plugins:[\"jsx\"]}\\); console.log\\(f,\"OK\"\\); } catch\\(e\\){ console.log\\(f,\"FAIL\",e.message\\); } }')"
+    ]
+  }
+}

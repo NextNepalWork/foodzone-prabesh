@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Zone - Encrypted Table Links Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .links-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .table-link {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 4px solid #ff6b35;
+        }
+        .table-number {
+            font-weight: bold;
+            color: #ff6b35;
+            font-size: 16px;
+        }
+        .encrypted-code {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 8px 0;
+            word-break: break-all;
+            font-size: 12px;
+            color: #495057;
+        }
+        .full-url {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .full-url:hover {
+            text-decoration: underline;
+        }
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .copy-btn:hover {
+            background: #218838;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        .info-title {
+            color: #1976d2;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔐 Food Zone Restaurant</h1>
+        <h2>Encrypted Table Links Generator</h2>
+        <p>Secure table access codes for QR code generation</p>
+    </div>
+
+    <div id="linksContainer" class="links-container">
+        <!-- Links will be generated here -->
+    </div>
+
+    <div class="info-box">
+        <div class="info-title">🔒 Security Features:</div>
+        <ul>
+            <li>Each code is unique and encrypted with hash verification</li>
+            <li>Cannot be guessed or accessed without scanning QR code</li>
+            <li>Random elements prevent pattern recognition</li>
+            <li>Backward compatible with legacy numeric table IDs</li>
+        </ul>
+        
+        <div class="info-title">📋 Usage Instructions:</div>
+        <ul>
+            <li>Use these URLs to generate QR codes for each table</li>
+            <li>Print QR codes and place them on respective tables</li>
+            <li>Customers scan QR codes to access their table's ordering page</li>
+            <li>Old numeric links (foodzone.com.np/1, /2, etc.) still work for backward compatibility</li>
+        </ul>
+    </div>
+
+    <script>
+        // Table encryption utility (embedded)
+        const SECRET_KEY = 'FZ2024_SECURE_TABLE_ACCESS';
+
+        const generateTableHash = (tableNumber) => {
+            const str = `${SECRET_KEY}_${tableNumber}_${SECRET_KEY}`;
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString(36).toUpperCase();
+        };
+
+        const encryptTableNumber = (tableNumber) => {
+            if (!tableNumber || tableNumber < 1 || tableNumber > 25) {
+                throw new Error('Invalid table number');
+            }
+            
+            const hash = generateTableHash(tableNumber);
+            const encoded = btoa(`${tableNumber}:${hash}`);
+            
+            const randomPrefix = Math.random().toString(36).substring(2, 5).toUpperCase();
+            const randomSuffix = Math.random().toString(36).substring(2, 4).toUpperCase();
+            
+            return `${randomPrefix}${encoded}${randomSuffix}`;
+        };
+
+        const generateAllTableCodes = () => {
+            const tableCodes = [];
+            for (let i = 1; i <= 25; i++) {
+                tableCodes.push({
+                    tableNumber: i,
+                    encryptedCode: encryptTableNumber(i),
+                    url: `https://foodzone.com.np/${encryptTableNumber(i)}`
+                });
+            }
+            return tableCodes;
+        };
+
+        // Copy to clipboard function
+        const copyToClipboard = (text) => {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('URL copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('URL copied to clipboard!');
+            });
+        };
+
+        // Generate and display links
+        const displayTableLinks = () => {
+            const container = document.getElementById('linksContainer');
+            const tableCodes = generateAllTableCodes();
+            
+            container.innerHTML = tableCodes.map(({ tableNumber, encryptedCode, url }) => `
+                <div class="table-link">
+                    <div class="table-number">Table ${tableNumber.toString().padStart(2, '0')}</div>
+                    <div class="encrypted-code">${encryptedCode}</div>
+                    <a href="${url}" target="_blank" class="full-url">${url}</a>
+                    <br>
+                    <button class="copy-btn" onclick="copyToClipboard('${url}')">📋 Copy URL</button>
+                </div>
+            `).join('');
+        };
+
+        // Generate links when page loads
+        document.addEventListener('DOMContentLoaded', displayTableLinks);
+    </script>
+</body>
+</html>

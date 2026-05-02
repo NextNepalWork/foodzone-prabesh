@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table Order System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .pending { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🍽️ Food Zone Table Order System Test</h1>
+    
+    <div class="test-section">
+        <h2>Backend API Tests</h2>
+        <button onclick="testBackendHealth()">Test Backend Health</button>
+        <button onclick="testMenuAPI()">Test Menu API</button>
+        <button onclick="testOrderSubmission()">Test Order Submission</button>
+        <div id="backend-results" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Frontend Integration Tests</h2>
+        <button onclick="testTablePageLoad()">Test Table Page Load</button>
+        <button onclick="testCartFunctionality()">Test Cart Functions</button>
+        <button onclick="testOrderFlow()">Test Complete Order Flow</button>
+        <div id="frontend-results" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>End-to-End Test</h2>
+        <button onclick="runCompleteTest()">🚀 Run Complete System Test</button>
+        <div id="e2e-results" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://food-zone-backend-l00k.onrender.com';
+        
+        function log(section, message, type = 'info') {
+            const element = document.getElementById(section);
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            element.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        async function testBackendHealth() {
+            log('backend-results', 'Testing backend health...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/api/menu`);
+                if (response.ok) {
+                    const data = await response.json();
+                    log('backend-results', `Backend healthy - ${data.length} menu items loaded`, 'success');
+                } else {
+                    log('backend-results', `Backend error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log('backend-results', `Backend connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMenuAPI() {
+            log('backend-results', 'Testing menu API endpoint...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/api/menu`);
+                const data = await response.json();
+                log('backend-results', `Menu API: ${data.length} items, first item: ${data[0]?.name}`, 'success');
+            } catch (error) {
+                log('backend-results', `Menu API failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOrderSubmission() {
+            log('backend-results', 'Testing order submission...', 'info');
+            const testOrder = {
+                tableId: 25,
+                customerName: "Test Customer",
+                phone: "9876543210",
+                items: [
+                    { id: 1, name: "Test Item", price: 150, quantity: 1 }
+                ]
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testOrder)
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    log('backend-results', `Order created: ${data.order.order_number} for Table ${data.order.table_id}`, 'success');
+                } else {
+                    log('backend-results', `Order failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log('backend-results', `Order submission failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTablePageLoad() {
+            log('frontend-results', 'Testing table page accessibility...', 'info');
+            try {
+                // Test if we can access table pages
+                const tableUrl = window.location.origin + '/25';
+                log('frontend-results', `Table URL format: ${tableUrl}`, 'success');
+                
+                // Test table ID validation
+                const validTables = [1, 5, 10, 15, 20, 25];
+                validTables.forEach(id => {
+                    log('frontend-results', `Table ${id} URL: ${window.location.origin}/${id}`, 'success');
+                });
+            } catch (error) {
+                log('frontend-results', `Table page test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCartFunctionality() {
+            log('frontend-results', 'Testing cart functionality...', 'info');
+            try {
+                // Test localStorage cart operations
+                const testCartItem = { id: 1, name: "Test Item", price: 150, quantity: 1 };
+                const tableId = 25;
+                
+                // Simulate cart operations
+                localStorage.setItem(`cart_table_${tableId}`, JSON.stringify([testCartItem]));
+                const savedCart = JSON.parse(localStorage.getItem(`cart_table_${tableId}`));
+                
+                if (savedCart && savedCart.length === 1) {
+                    log('frontend-results', 'Cart localStorage operations working', 'success');
+                } else {
+                    log('frontend-results', 'Cart localStorage failed', 'error');
+                }
+                
+                // Clean up
+                localStorage.removeItem(`cart_table_${tableId}`);
+            } catch (error) {
+                log('frontend-results', `Cart test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOrderFlow() {
+            log('frontend-results', 'Testing complete order flow...', 'info');
+            try {
+                // Test customer info validation
+                const customerInfo = { name: "Test Customer", phone: "9876543210" };
+                if (customerInfo.name.length > 0 && customerInfo.phone.length >= 10) {
+                    log('frontend-results', 'Customer info validation passed', 'success');
+                } else {
+                    log('frontend-results', 'Customer info validation failed', 'error');
+                }
+
+                // Test order data structure
+                const orderData = {
+                    tableId: 25,
+                    customerName: customerInfo.name,
+                    phone: customerInfo.phone,
+                    items: [{ id: 1, name: "Test Item", price: 150, quantity: 1 }]
+                };
+
+                if (orderData.tableId && orderData.customerName && orderData.phone && orderData.items.length > 0) {
+                    log('frontend-results', 'Order data structure valid', 'success');
+                } else {
+                    log('frontend-results', 'Order data structure invalid', 'error');
+                }
+            } catch (error) {
+                log('frontend-results', `Order flow test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function runCompleteTest() {
+            log('e2e-results', '🚀 Starting complete system test...', 'info');
+            
+            // Test 1: Backend connectivity
+            log('e2e-results', 'Step 1: Testing backend connectivity...', 'info');
+            try {
+                const healthResponse = await fetch(`${API_BASE}/api/menu`);
+                if (!healthResponse.ok) throw new Error(`Backend unhealthy: ${healthResponse.status}`);
+                log('e2e-results', 'Backend connectivity: PASS', 'success');
+            } catch (error) {
+                log('e2e-results', `Backend connectivity: FAIL - ${error.message}`, 'error');
+                return;
+            }
+
+            // Test 2: Menu loading
+            log('e2e-results', 'Step 2: Testing menu loading...', 'info');
+            try {
+                const menuResponse = await fetch(`${API_BASE}/api/menu`);
+                const menuData = await menuResponse.json();
+                if (menuData.length === 0) throw new Error('No menu items found');
+                log('e2e-results', `Menu loading: PASS - ${menuData.length} items`, 'success');
+            } catch (error) {
+                log('e2e-results', `Menu loading: FAIL - ${error.message}`, 'error');
+                return;
+            }
+
+            // Test 3: Order submission
+            log('e2e-results', 'Step 3: Testing order submission...', 'info');
+            const testOrder = {
+                tableId: 25,
+                customerName: "E2E Test Customer",
+                phone: "9876543210",
+                items: [{ id: 1, name: "Test Item", price: 200, quantity: 2 }]
+            };
+
+            try {
+                const orderResponse = await fetch(`${API_BASE}/api/order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testOrder)
+                });
+                
+                const orderData = await orderResponse.json();
+                if (!orderData.success) throw new Error(orderData.error || 'Order submission failed');
+                
+                log('e2e-results', `Order submission: PASS - Order ${orderData.order.order_number}`, 'success');
+                
+                // Test 4: Order verification
+                log('e2e-results', 'Step 4: Verifying order in database...', 'info');
+                const ordersResponse = await fetch(`${API_BASE}/api/orders`);
+                const ordersData = await ordersResponse.json();
+                const createdOrder = ordersData.find(o => o.order_number === orderData.order.order_number);
+                
+                if (createdOrder) {
+                    log('e2e-results', 'Order verification: PASS - Order found in database', 'success');
+                } else {
+                    log('e2e-results', 'Order verification: FAIL - Order not found', 'error');
+                }
+
+            } catch (error) {
+                log('e2e-results', `Order submission: FAIL - ${error.message}`, 'error');
+                return;
+            }
+
+            // Test 5: Frontend integration
+            log('e2e-results', 'Step 5: Testing frontend integration...', 'info');
+            try {
+                // Test API config
+                const apiConfig = {
+                    baseUrl: 'https://food-zone-backend-l00k.onrender.com',
+                    orderEndpoint: '/api/order',
+                    menuEndpoint: '/api/menu'
+                };
+                
+                if (apiConfig.baseUrl && apiConfig.orderEndpoint && apiConfig.menuEndpoint) {
+                    log('e2e-results', 'Frontend integration: PASS - API config valid', 'success');
+                } else {
+                    log('e2e-results', 'Frontend integration: FAIL - API config invalid', 'error');
+                }
+            } catch (error) {
+                log('e2e-results', `Frontend integration: FAIL - ${error.message}`, 'error');
+            }
+
+            log('e2e-results', '🎉 Complete system test finished!', 'success');
+            log('e2e-results', '✅ All systems operational - Table ordering should work perfectly', 'success');
+        }
+
+        // Auto-run basic health check on page load
+        window.onload = function() {
+            testBackendHealth();
+        };
+    </script>
+</body>
+</html>

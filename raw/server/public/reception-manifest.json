@@ -1,0 +1,54 @@
+{
+  "name": "Food Zone Reception Desk",
+  "short_name": "FZ Reception",
+  "description": "Food Zone Restaurant Reception Desk - Manage orders, tables, and customer service",
+  "start_url": "/reception",
+  "display": "standalone",
+  "background_color": "#f0f9ff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/reception",
+  "icons": [
+    {
+      "src": "/images/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Active Orders",
+      "short_name": "Active",
+      "description": "View active orders",
+      "url": "/reception?tab=active",
+      "icons": [
+        {
+          "src": "/images/logo.jpg",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Table Status",
+      "short_name": "Tables",
+      "description": "Check table availability",
+      "url": "/reception?tab=tables",
+      "icons": [
+        {
+          "src": "/images/logo.jpg",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}
