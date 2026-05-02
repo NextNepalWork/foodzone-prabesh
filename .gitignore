@@ -12,6 +12,8 @@ dist/
 # .env.development.local
 # .env.test.local
 # .env.production.local
+server/.env.production
+RAILWAY_ENV_COPY_PASTE.txt
 
 # Logs
 npm-debug.log*
