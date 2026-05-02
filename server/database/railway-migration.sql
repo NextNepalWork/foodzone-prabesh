@@ -107,6 +107,26 @@ CREATE TABLE IF NOT EXISTS staff (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7.5. Create table_sessions table for dine-in management
+CREATE TABLE IF NOT EXISTS table_sessions (
+    id SERIAL PRIMARY KEY,
+    table_id VARCHAR(10) NOT NULL,
+    customer_name VARCHAR(100),
+    customer_phone VARCHAR(20),
+    status VARCHAR(20) DEFAULT 'active',
+    total_amount DECIMAL(10,2) DEFAULT 0,
+    payment_status VARCHAR(20) DEFAULT 'unpaid',
+    notes TEXT,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for table_sessions
+CREATE INDEX IF NOT EXISTS idx_table_sessions_table_id ON table_sessions(table_id);
+CREATE INDEX IF NOT EXISTS idx_table_sessions_status ON table_sessions(status);
+
 -- 8. Update payment method constraints to include all methods
 -- Drop existing constraint if it exists
 ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check;
@@ -120,10 +140,24 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10,2);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'pending';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_latitude DECIMAL(10,8);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_longitude DECIMAL(11,8);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_landmark TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_distance DECIMAL(6,2);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee DECIMAL(10,2) DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS table_session_id INTEGER;
+
+-- Make customer fields nullable for dine-in orders
+ALTER TABLE orders ALTER COLUMN customer_phone DROP NOT NULL;
+ALTER TABLE orders ALTER COLUMN customer_name DROP NOT NULL;
 
 -- 10. Add missing columns to order_items table if they don't exist
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS item_name VARCHAR(200);
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS name VARCHAR(200);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS menu_item_category VARCHAR(100);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_vegetarian BOOLEAN DEFAULT false;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_spicy BOOLEAN DEFAULT false;
 
 -- 11. Update order status constraints
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
@@ -143,10 +177,34 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 
--- 13. Insert default admin user if not exists (password: admin123)
-INSERT INTO staff (username, password_hash, full_name, role) 
-VALUES ('admin', '$2b$10$8K1p/a0dclxKoNqIfrHb2eUiPiC3dX6t8uCfAiAJ6Vvhj2WlBSdHy', 'System Administrator', 'Manager')
-ON CONFLICT (username) DO NOTHING;
+-- 13. Insert default staff users if not exists
+-- Admin password: FoodZone2024!
+INSERT INTO staff (username, password_hash, full_name, role, is_active) 
+VALUES ('admin', '$2b$10$kBdrwDTQptt1D2jdHs/aWu/OSaXBIM47dj3.6CuTxRPEyqLci3r2.', 'Administrator', 'Admin', true)
+ON CONFLICT (username) DO UPDATE SET 
+    password_hash = EXCLUDED.password_hash,
+    role = EXCLUDED.role,
+    is_active = EXCLUDED.is_active;
+
+-- Manager password: Manager2024!
+INSERT INTO staff (username, password_hash, full_name, role, is_active)
+VALUES ('manager', '$2b$10$feZXqZeabG/lHhTQPBSm.utZRaDP8KhYDR268y95kKjMuzU/BvtCi', 'Manager', 'Manager', true)
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+
+-- Chef password: Chef2024!
+INSERT INTO staff (username, password_hash, full_name, role, is_active)
+VALUES ('chef', '$2b$10$CmEBVSfGYPz0SQY3QykmhegmeRMbNlfzp.kNUnCICU2VhLB.cwq4G', 'Chef', 'Chef', true)
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+
+-- Waiter password: Waiter2024!
+INSERT INTO staff (username, password_hash, full_name, role, is_active)
+VALUES ('waiter', '$2b$10$Bj/0J4aPxOGt/YVPMTNCtesaTPR3h00IoyuO5qyS06ohPszCM.dnG', 'Waiter', 'Waiter', true)
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+
+-- Cashier password: Cashier2024!
+INSERT INTO staff (username, password_hash, full_name, role, is_active)
+VALUES ('cashier', '$2b$10$AgyiUYewemKhD2OXNK0CueYPlPeCJG.Qgo/8Qx4oXFUr7nAiM6H6y', 'Cashier', 'Cashier', true)
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- 14. Ensure order_type consistency
 UPDATE orders SET order_type = 'dine-in' WHERE order_type = 'dine_in';
