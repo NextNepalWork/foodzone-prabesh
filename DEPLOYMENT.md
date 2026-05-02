@@ -12,7 +12,7 @@
 1. Go to https://railway.app
 2. Click "New Project"
 3. Select "Deploy from GitHub repo"
-4. Choose `prabeshlamsal470-tech/foodzone`
+4. Choose `NextNepalWork/foodzone-prabesh`
 
 ### Step 2: Add PostgreSQL Database
 
@@ -129,7 +129,7 @@ Railway will detect the push and redeploy automatically!
 
 ## 🎯 Current Status
 
-✅ Code pushed to GitHub: https://github.com/prabeshlamsal470-tech/foodzone
+✅ Code pushed to GitHub: https://github.com/NextNepalWork/foodzone-prabesh
 ✅ Railway configuration added
 ✅ Production API URL configured
 ✅ All report endpoints fixed

@@ -23,7 +23,7 @@ All report endpoints now support:
 - Custom ranges with `from` and `to` parameters
 
 ### 3. **GitHub Repository**
-✅ **Pushed to**: https://github.com/prabeshlamsal470-tech/foodzone
+✅ **Pushed to**: https://github.com/NextNepalWork/foodzone-prabesh
 
 **Commits:**
 1. Main codebase with all fixes
@@ -44,7 +44,7 @@ REACT_APP_SOCKET_URL=https://api.foodzone.com.np
 2. Sign in with GitHub
 3. Click "New Project"
 4. Select "Deploy from GitHub repo"
-5. Choose `prabeshlamsal470-tech/foodzone`
+5. Choose `NextNepalWork/foodzone-prabesh`
 
 ### Step 2: Add PostgreSQL
 1. In Railway project, click "New"
@@ -147,5 +147,5 @@ Your Food Zone application is now:
 
 ---
 
-**Repository**: https://github.com/prabeshlamsal470-tech/foodzone
+**Repository**: https://github.com/NextNepalWork/foodzone-prabesh
 **Last Updated**: January 2025
