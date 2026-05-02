@@ -53,38 +53,84 @@ CASHIER_PASSWORD=Cashier2024!
 CORS_ORIGIN=https://foodzone.com.np,https://www.foodzone.com.np
 ```
 
-### Step 4: Deploy
+### Step 4: Deploy Backend to Railway
 
 Railway will automatically:
-1. Build the frontend (`npm run build` in client folder)
-2. Copy build files to `server/public/`
-3. Install server dependencies
-4. Start the server with `node server.js`
+1. Install server dependencies (`npm install` in server folder)
+2. Start the server with `node server.js`
 
-### Step 5: Set Up Custom Domain
+**Note**: Frontend is deployed separately (see Step 7)
+
+### Step 5: Set Up Custom Domain for Backend
 
 1. In Railway project settings, go to "Settings" → "Domains"
 2. Add your custom domain: `api.foodzone.com.np`
 3. Update your DNS records as instructed by Railway
 
-### Step 6: Update Frontend API URL
+### Step 6: Deploy Frontend Separately
 
-After deployment, update your frontend to point to the Railway backend:
+Your frontend (`foodzone.com.np`) should be deployed to a separate hosting service:
 
-**For production build**, set in `client/.env.production`:
+**Recommended Options:**
+- **Vercel** (recommended for React apps)
+- **Netlify**
+- **Cloudflare Pages**
+
+**Build Settings:**
+```bash
+# Root directory
+client
+
+# Build command
+npm install && npm run build
+
+# Output directory
+build
+```
+
+**Environment Variables for Frontend:**
 ```env
 REACT_APP_API_URL=https://api.foodzone.com.np
 REACT_APP_SOCKET_URL=https://api.foodzone.com.np
+GENERATE_SOURCEMAP=false
 ```
 
-Then rebuild and redeploy your frontend.
+### Step 7: Configure Frontend Domain
+
+Point `foodzone.com.np` to your frontend hosting provider (Vercel/Netlify/etc.)
+
+## 🌐 Domain Configuration
+
+### Your Setup:
+- **Frontend**: `foodzone.com.np` (hosted separately - Vercel/Netlify/etc.)
+- **Backend**: `api.foodzone.com.np` (Railway)
+
+### DNS Records:
+Add these records in your DNS provider:
+
+**Backend (Railway):**
+```
+Type: CNAME
+Name: api
+Value: <your-railway-domain>.railway.app
+```
+
+**Frontend (Your hosting provider):**
+```
+Type: A or CNAME
+Name: @
+Value: <your-frontend-hosting-ip-or-domain>
+```
 
 ## 📋 Post-Deployment Checklist
 
 - [ ] Database connected and migrations run
-- [ ] Environment variables set
-- [ ] Custom domain configured
-- [ ] Frontend pointing to correct API URL
+- [ ] Environment variables set (see RAILWAY_ENV_VARIABLES.md)
+- [ ] Custom domain configured (api.foodzone.com.np)
+- [ ] DNS records updated
+- [ ] Frontend deployed separately to foodzone.com.np
+- [ ] Frontend pointing to correct API URL (https://api.foodzone.com.np)
+- [ ] CORS configured for foodzone.com.np
 - [ ] Test admin login
 - [ ] Test order creation
 - [ ] Test reports & analytics
