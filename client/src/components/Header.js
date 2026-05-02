@@ -8,14 +8,6 @@ const Header = React.memo(() => {
   const [isScrolled, setIsScrolled] = useState(false);
   const restaurantInfo = useRestaurantInfo();
   
-  // CRITICAL FIX v3 (Build: 2026-05-02): Never render on admin, staff, or reception pages
-  // This prevents customer header from showing on admin dashboard
-  if (location.pathname.startsWith('/admin') || 
-      location.pathname.startsWith('/staff') || 
-      location.pathname.startsWith('/reception')) {
-    return null;
-  }
-  
   // Memoize page type calculations to prevent re-renders
   const pageInfo = useMemo(() => {
     const path = location.pathname;
@@ -47,6 +39,15 @@ const Header = React.memo(() => {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // CRITICAL FIX v3 (Build: 2026-05-02): Never render on admin, staff, or reception pages
+  // This prevents customer header from showing on admin dashboard
+  // IMPORTANT: This check must come AFTER all hooks to comply with React rules
+  if (location.pathname.startsWith('/admin') || 
+      location.pathname.startsWith('/staff') || 
+      location.pathname.startsWith('/reception')) {
+    return null;
+  }
 
   return (
     <header className={`sticky top-0 z-50 ${isTablePage ? 'bg-gradient-to-r from-amber-800 to-yellow-800' : 'bg-transparent'}`}>
