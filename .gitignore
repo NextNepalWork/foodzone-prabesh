@@ -14,6 +14,7 @@ dist/
 # .env.production.local
 server/.env.production
 RAILWAY_ENV_COPY_PASTE.txt
+VERCEL_ENV_COPY_PASTE.txt
 
 # Logs
 npm-debug.log*

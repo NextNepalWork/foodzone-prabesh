@@ -8,7 +8,7 @@ const Header = React.memo(() => {
   const [isScrolled, setIsScrolled] = useState(false);
   const restaurantInfo = useRestaurantInfo();
   
-  // CRITICAL FIX v2: Never render on admin, staff, or reception pages
+  // CRITICAL FIX v3 (Build: 2026-05-02): Never render on admin, staff, or reception pages
   // This prevents customer header from showing on admin dashboard
   if (location.pathname.startsWith('/admin') || 
       location.pathname.startsWith('/staff') || 
