@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchApi } from '../../services/apiService';
 import { useTableCount } from '../../hooks/useSettings';
+import { useDateTimeFormatter } from '../../hooks/useDateTimeFormatter';
 
 const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refreshTrigger }) => {
   const tableCount = useTableCount(); // Get table count from settings
+  const { formatTime: formatTimeWithTZ, formatDate: formatDateWithTZ, formatDateTime } = useDateTimeFormatter();
   const [activeFilter, setActiveFilter] = useState(() => {
     return localStorage.getItem('orderManagementActiveFilter') || 'all';
   });
@@ -848,18 +850,13 @@ const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, 
     return colors[status] || colors.pending;
   };
 
+  // Use timezone-aware formatters from useDateTimeFormatter hook
   const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatTimeWithTZ(dateString);
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
+    return formatDateWithTZ(dateString, { month: 'short', day: 'numeric' });
   };
 
   const getTotalAmount = (order) => {
@@ -1368,8 +1365,10 @@ const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, 
 
 // Order Details Modal Component
 const OrderDetailsModal = ({ order, loading, onClose, onRefresh }) => {
+  const { formatDateTime: formatDateTimeWithTZ } = useDateTimeFormatter();
+  
   const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleString('en-US', {
+    return formatDateTimeWithTZ(dateString, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

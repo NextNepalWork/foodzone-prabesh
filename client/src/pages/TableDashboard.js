@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../services/apiService';
 import PaymentQRModal from '../components/PaymentQRModal';
+import { useDateTimeFormatter } from '../hooks/useDateTimeFormatter';
 import './TableDashboard.css';
 
 const TableDashboard = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  const { formatTime: formatTimeWithTZ, formatDate: formatDateWithTZ, isToday: isTodayWithTZ } = useDateTimeFormatter();
   
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,12 +136,7 @@ const TableDashboard = () => {
   };
 
   const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: true 
-    });
+    return formatTimeWithTZ(dateString, { hour12: true });
   };
 
   const formatDate = (dateString) => {
@@ -148,15 +145,13 @@ const TableDashboard = () => {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
+    // Use timezone-aware isToday check
+    if (isTodayWithTZ(date)) {
       return 'Today';
     } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Yesterday';
     } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
-      });
+      return formatDateWithTZ(date, { month: 'short', day: 'numeric' });
     }
   };
 
