@@ -722,11 +722,11 @@ router.put('/tenant', authenticateToken, requireAdmin, async (req, res) => {
 router.get('/menu-photos', async (req, res) => {
   try {
     const { rows } = await query(`
-      SELECT value FROM restaurant_settings WHERE key = 'menu.photos'
+      SELECT setting_value FROM restaurant_settings WHERE setting_key = 'menu.photos'
     `);
     
-    if (rows.length > 0 && rows[0].value) {
-      const photos = JSON.parse(rows[0].value);
+    if (rows.length > 0 && rows[0].setting_value) {
+      const photos = JSON.parse(rows[0].setting_value);
       res.json({ photos });
     } else {
       // Return default menu photos
@@ -764,10 +764,10 @@ router.post('/menu-photos', authenticateToken, requireAdmin, async (req, res) =>
     
     // Upsert the menu photos setting
     await query(`
-      INSERT INTO restaurant_settings (key, value, updated_at)
+      INSERT INTO restaurant_settings (setting_key, setting_value, updated_at)
       VALUES ('menu.photos', $1, CURRENT_TIMESTAMP)
-      ON CONFLICT (key) DO UPDATE SET
-        value = EXCLUDED.value,
+      ON CONFLICT (setting_key) DO UPDATE SET
+        setting_value = EXCLUDED.setting_value,
         updated_at = CURRENT_TIMESTAMP
     `, [photosJson]);
 

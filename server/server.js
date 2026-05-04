@@ -41,6 +41,7 @@ const settingsRoutes = require('./routes/settings');
 const tableSessionRoutes = require('./routes/tableSession');
 const paymentQRRoutes = require('./routes/paymentQR');
 const reportsRoutes = require('./routes/reports');
+const uploadRoutes = require('./routes/upload');
 const settingsLoader = require('./utils/settingsLoader');
 const orderingHoursValidator = require('./utils/orderingHoursValidator');
 
@@ -258,6 +259,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/table-session', tableSessionRoutes);
 app.use('/api/payment-qr', paymentQRRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Serve static files including images
 app.use(express.static(path.join(__dirname, 'public')));
