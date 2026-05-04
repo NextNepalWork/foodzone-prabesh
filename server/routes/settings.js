@@ -714,6 +714,70 @@ router.put('/tenant', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------------
+   Menu Photos Management
+   ------------------------------------------------------------ */
+
+// GET /api/settings/menu-photos - Get list of menu photo URLs
+router.get('/menu-photos', async (req, res) => {
+  try {
+    const { rows } = await query(`
+      SELECT value FROM restaurant_settings WHERE key = 'menu.photos'
+    `);
+    
+    if (rows.length > 0 && rows[0].value) {
+      const photos = JSON.parse(rows[0].value);
+      res.json({ photos });
+    } else {
+      // Return default menu photos
+      res.json({
+        photos: [
+          '/menu/1.jpg',
+          '/menu/2.jpeg',
+          '/menu/3.jpeg',
+          '/menu/4.jpg',
+          '/menu/5.jpg',
+          '/menu/6.jpeg',
+          '/menu/7.jpeg',
+          '/menu/8.jpeg',
+          '/menu/9.jpeg',
+          '/menu/10.jpeg'
+        ]
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching menu photos:', err);
+    res.status(500).json({ error: 'Failed to fetch menu photos', details: err.message });
+  }
+});
+
+// POST /api/settings/menu-photos - Update menu photos list
+router.post('/menu-photos', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { photos } = req.body;
+    
+    if (!Array.isArray(photos)) {
+      return res.status(400).json({ error: 'Photos must be an array' });
+    }
+
+    const photosJson = JSON.stringify(photos);
+    
+    // Upsert the menu photos setting
+    await query(`
+      INSERT INTO restaurant_settings (key, value, updated_at)
+      VALUES ('menu.photos', $1, CURRENT_TIMESTAMP)
+      ON CONFLICT (key) DO UPDATE SET
+        value = EXCLUDED.value,
+        updated_at = CURRENT_TIMESTAMP
+    `, [photosJson]);
+
+    res.json({ success: true, photos });
+  } catch (err) {
+    console.error('Error updating menu photos:', err);
+    res.status(500).json({ error: 'Failed to update menu photos', details: err.message });
+  }
+});
+
 module.exports = router;
 module.exports.SECTIONS = SECTIONS;
 module.exports.FIELDS = FIELDS;

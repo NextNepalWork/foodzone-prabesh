@@ -38,6 +38,7 @@ const TableOrder = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showCart, setShowCart] = useState(false);
   const [showImageMenu, setShowImageMenu] = useState(false);
+  const [menuPhotos, setMenuPhotos] = useState([]);
   const [slidePosition, setSlidePosition] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
   const [slideComplete, setSlideComplete] = useState(false);
@@ -127,6 +128,35 @@ const TableOrder = () => {
       setLoading(false);
     }
   };
+
+  // Load menu photos from settings
+  useEffect(() => {
+    const fetchMenuPhotos = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_URL || ''}/api/settings/menu-photos`);
+        const data = await response.json();
+        if (data.photos && Array.isArray(data.photos)) {
+          setMenuPhotos(data.photos);
+        }
+      } catch (error) {
+        console.error('Error fetching menu photos:', error);
+        // Fallback to default photos
+        setMenuPhotos([
+          '/menu/1.jpg',
+          '/menu/2.jpeg',
+          '/menu/3.jpeg',
+          '/menu/4.jpg',
+          '/menu/5.jpg',
+          '/menu/6.jpeg',
+          '/menu/7.jpeg',
+          '/menu/8.jpeg',
+          '/menu/9.jpeg',
+          '/menu/10.jpeg'
+        ]);
+      }
+    };
+    fetchMenuPhotos();
+  }, []);
 
   const handleSubmitOrder = async () => {
     setErrorMessage('');
@@ -744,17 +774,26 @@ const TableOrder = () => {
             className="flex-1 overflow-y-auto touch-scroll px-3 pb-6"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Menu Images */}
-            <img src="/menu/1.jpg" alt="Menu Page 1" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/2.jpeg" alt="Menu Page 2" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/3.jpeg" alt="Menu Page 3" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/4.jpg" alt="Menu Page 4" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/5.jpg" alt="Menu Page 5" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/6.jpeg" alt="Menu Page 6" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/7.jpeg" alt="Menu Page 7" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/8.jpeg" alt="Menu Page 8" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/9.jpeg" alt="Menu Page 9" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
-            <img src="/menu/10.jpeg" alt="Menu Page 10" className="w-full rounded-lg shadow-xl mb-3" loading="lazy" />
+            {/* Menu Images - Dynamically loaded */}
+            {menuPhotos.length > 0 ? (
+              menuPhotos.map((photo, index) => (
+                <img
+                  key={index}
+                  src={photo}
+                  alt={`Menu Page ${index + 1}`}
+                  className="w-full rounded-lg shadow-xl mb-3"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              ))
+            ) : (
+              <div className="text-center text-white py-12">
+                <p className="text-lg mb-2">📖</p>
+                <p>No menu photos available</p>
+              </div>
+            )}
             <p className="text-center text-white/70 text-xs mt-2">
               Pinch to zoom · Tap outside to close
             </p>

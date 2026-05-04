@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../../services/apiService';
 import MenuItemModal from './MenuItemModal';
 import CategoryManagementModal from './CategoryManagementModal';
+import MenuPhotosModal from './MenuPhotosModal';
 
 const MenuManagement = ({ refreshTrigger }) => {
   const [menuItems, setMenuItems] = useState([]);
@@ -13,6 +14,7 @@ const MenuManagement = ({ refreshTrigger }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showMenuPhotosModal, setShowMenuPhotosModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -336,6 +338,13 @@ const MenuManagement = ({ refreshTrigger }) => {
           
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowMenuPhotosModal(true)}
+              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition flex items-center gap-1.5"
+            >
+              <span>📸</span>
+              <span>Menu Photos</span>
+            </button>
+            <button
               onClick={() => setShowCategoryModal(true)}
               className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition flex items-center gap-1.5"
             >
@@ -491,6 +500,14 @@ const MenuManagement = ({ refreshTrigger }) => {
           menuItems={menuItems}
           onClose={() => setShowCategoryModal(false)}
           onSave={handleCategoryManagement}
+        />
+      )}
+
+      {/* Menu Photos Modal */}
+      {showMenuPhotosModal && (
+        <MenuPhotosModal
+          isOpen={showMenuPhotosModal}
+          onClose={() => setShowMenuPhotosModal(false)}
         />
       )}
     </div>
