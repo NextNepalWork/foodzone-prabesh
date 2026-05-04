@@ -839,6 +839,8 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
 
 // Premium Order Card Component
 const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, onViewDetails, onRefresh, compact, mini }) => {
+  const { formatTime: formatTimeWithTZ, formatDate: formatDateWithTZ } = useDateTimeFormatter();
+  
   const getStatusColor = (status) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
