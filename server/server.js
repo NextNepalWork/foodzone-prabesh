@@ -1098,6 +1098,8 @@ app.get('/api/orders/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
     
+    console.log(`📋 Fetching order details for ID: ${orderId}`);
+    
     // Get order details with items
     const orderResult = await query(`
       SELECT 
@@ -1133,33 +1135,45 @@ app.get('/api/orders/:orderId', async (req, res) => {
     }
 
     const order = orderResult.rows[0];
+    console.log(`✅ Order found: ${order.order_number}`);
     
     // Get payment history if exists
-    const paymentHistory = await query(`
-      SELECT 
-        transaction_type,
-        amount,
-        description,
-        created_at
-      FROM daybook_transactions 
-      WHERE order_id = $1 
-      ORDER BY created_at DESC
-    `, [orderId]);
+    let paymentHistory = { rows: [] };
+    try {
+      paymentHistory = await query(`
+        SELECT 
+          transaction_type,
+          amount,
+          description,
+          created_at
+        FROM daybook_transactions 
+        WHERE order_id = $1 
+        ORDER BY created_at DESC
+      `, [orderId]);
+    } catch (paymentError) {
+      console.warn(`⚠️ Could not fetch payment history for order ${orderId}:`, paymentError.message);
+      // Continue without payment history
+    }
 
     // Get table information if it's a dine-in order
     let tableInfo = null;
     if (order.table_id) {
-      const tableResult = await query(`
-        SELECT 
-          table_number,
-          capacity,
-          status
-        FROM tables 
-        WHERE id = $1
-      `, [order.table_id]);
-      
-      if (tableResult.rows.length > 0) {
-        tableInfo = tableResult.rows[0];
+      try {
+        const tableResult = await query(`
+          SELECT 
+            table_number,
+            capacity,
+            status
+          FROM tables 
+          WHERE id = $1
+        `, [order.table_id]);
+        
+        if (tableResult.rows.length > 0) {
+          tableInfo = tableResult.rows[0];
+        }
+      } catch (tableError) {
+        console.warn(`⚠️ Could not fetch table info for order ${orderId}:`, tableError.message);
+        // Continue without table info
       }
     }
 
@@ -1189,10 +1203,13 @@ app.get('/api/orders/:orderId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching order details:', error);
+    console.error(`❌ Error fetching order details for ID ${req.params.orderId}:`, error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch order details'
+      message: 'Failed to fetch order details',
+      error: error.message
     });
   }
 });
