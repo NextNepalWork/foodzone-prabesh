@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import dateTimeFormatter from '../utils/dateTimeFormatter';
 
 /**
@@ -14,37 +14,38 @@ export function useDateTimeFormatter() {
     setRefresh(prev => prev + 1);
   }, []);
 
-  const formatDate = useCallback((date, options) => {
+  // Don't use useCallback - we want these to use the latest settings
+  const formatDate = (date, options) => {
     return dateTimeFormatter.formatDate(date, options);
-  }, []);
+  };
 
-  const formatTime = useCallback((date, options) => {
+  const formatTime = (date, options) => {
     return dateTimeFormatter.formatTime(date, options);
-  }, []);
+  };
 
-  const formatDateTime = useCallback((date, options) => {
+  const formatDateTime = (date, options) => {
     return dateTimeFormatter.formatDateTime(date, options);
-  }, []);
+  };
 
-  const formatTimeWithWeekday = useCallback((date) => {
+  const formatTimeWithWeekday = (date) => {
     return dateTimeFormatter.formatTimeWithWeekday(date);
-  }, []);
+  };
 
-  const getCurrentDate = useCallback(() => {
+  const getCurrentDate = () => {
     return dateTimeFormatter.getCurrentDate();
-  }, []);
+  };
 
-  const getCurrentTime = useCallback(() => {
+  const getCurrentTime = () => {
     return dateTimeFormatter.getCurrentTime();
-  }, []);
+  };
 
-  const isToday = useCallback((date) => {
+  const isToday = (date) => {
     return dateTimeFormatter.isToday(date);
-  }, []);
+  };
 
-  const getTimezoneOffset = useCallback(() => {
+  const getTimezoneOffset = () => {
     return dateTimeFormatter.getTimezoneOffset();
-  }, []);
+  };
 
   return {
     formatDate,
