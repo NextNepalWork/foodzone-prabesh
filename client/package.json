@@ -1,6 +1,6 @@
 {
   "name": "restaurant-client",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "homepage": "/",
   "private": true,
   "proxy": "http://localhost:3000",

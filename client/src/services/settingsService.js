@@ -68,6 +68,11 @@ class SettingsService {
       
       // Display
       'locale.currency_symbol': 'Rs.',
+      'locale.currency_code': 'NPR',
+      'locale.currency_position': 'prefix',
+      'locale.timezone': 'Asia/Kathmandu',
+      'locale.date_format': 'YYYY-MM-DD',
+      'locale.time_format': '12h',
       'locale.language': 'en',
       
       // Customer app
