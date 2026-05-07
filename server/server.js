@@ -1848,7 +1848,7 @@ app.put('/api/orders/:orderId/payment-status', authenticateToken, requireFrontSt
     
     // Update payment status in database
     const result = await query(
-      'UPDATE orders SET payment_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      'UPDATE orders SET payment_status = $1, updated_at = TIMEZONE(\'UTC\', NOW()) WHERE id = $2 RETURNING *',
       [payment_status, orderId]
     );
     

@@ -54,18 +54,7 @@ class DateTimeFormatter {
       ...options
     };
 
-    console.log('🕐 formatTime called:', {
-      input: date,
-      parsedDate: d.toISOString(),
-      timezone: this.settings.timezone,
-      timeFormat: this.settings.timeFormat,
-      hour12,
-      locale
-    });
-
-    const result = d.toLocaleTimeString(locale, defaultOptions);
-    console.log('🕐 formatTime result:', result);
-    return result;
+    return d.toLocaleTimeString(locale, defaultOptions);
   }
 
   /**

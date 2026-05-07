@@ -78,14 +78,15 @@ class Order {
         orderData.total, orderData.paymentMethod, orderData.notes
       ]);
       
-      // Create order
+      // Create order with explicit UTC timestamp
       const orderResult = await client.query(`
         INSERT INTO orders (
           order_number, order_type, customer_id, customer_name, customer_phone,
           delivery_address, delivery_latitude, delivery_longitude, delivery_landmark,
           delivery_distance, delivery_fee, table_id, subtotal, discount, total,
-          payment_method, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          payment_method, notes, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 
+                  TIMEZONE('UTC', NOW()), TIMEZONE('UTC', NOW()))
         RETURNING *
       `, [
         orderNumber, orderData.orderType, orderData.customerId, orderData.customerName,
@@ -382,7 +383,7 @@ class Order {
 
   static async updateStatus(orderId, status, completedAt = null) {
     const params = [status, orderId];
-    let query_text = 'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP';
+    let query_text = 'UPDATE orders SET status = $1, updated_at = TIMEZONE(\'UTC\', NOW())';
     
     if (completedAt && (status === 'completed' || status === 'cancelled')) {
       query_text += ', completed_at = $3';
