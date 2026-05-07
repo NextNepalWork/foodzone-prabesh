@@ -41,15 +41,13 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
   
   // Advanced filters with localStorage persistence
   const [advancedFilters, setAdvancedFilters] = useState(() => {
-    const today = new Date().toISOString().split('T')[0];
-    
-    // ALWAYS use today's date for Order Management
-    // This ensures we only show today's orders
+    // Don't default to today's date - let users see all orders
+    // They can filter by date if needed
     return {
       paymentStatus: '',
       tableNumber: '',
-      startDate: today,
-      endDate: today,
+      startDate: '',
+      endDate: '',
       sortBy: 'created_at',
       sortOrder: 'DESC'
     };
@@ -322,19 +320,17 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
     }
   }, [orders]);
 
-  // Reset all filters and show today's orders
+  // Reset all filters and show all orders
   // eslint-disable-next-line no-unused-vars
   const resetAllFilters = () => {
-    const today = new Date().toISOString().split('T')[0];
-    
     // Reset all filters
     setActiveFilter('all');
     setSearchTerm('');
     setAdvancedFilters({
       paymentStatus: '',
       tableNumber: '',
-      startDate: today,
-      endDate: today,
+      startDate: '',
+      endDate: '',
       sortBy: 'created_at',
       sortOrder: 'DESC'
     });
@@ -344,7 +340,7 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
     localStorage.removeItem('orderManagementSearchTerm');
     localStorage.removeItem('orderManagementFilters');
     
-    console.log('🔄 All filters reset, showing today\'s orders:', today);
+    console.log('🔄 All filters reset, showing all orders');
   };
   
   const dineInOrders = orders.filter(o => o.order_type === 'dine-in' || o.order_type === 'dine_in' || (!o.order_type && o.table_id));
