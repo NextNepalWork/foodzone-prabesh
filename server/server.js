@@ -1932,12 +1932,16 @@ app.post('/api/settings/tables', (req, res) => {
 // Happy Hour settings endpoints
 app.get('/api/settings/happy-hour', async (req, res) => {
   try {
-    const result = await query(
-      'SELECT setting_value FROM restaurant_settings WHERE setting_key = $1',
-      ['happy_hour_enabled']
-    );
+    // Check both old and new setting keys for backwards compatibility
+    const result = await query(`
+      SELECT setting_value FROM restaurant_settings 
+      WHERE setting_key IN ('happy_hour_enabled', 'happyhour.enabled')
+      ORDER BY setting_key DESC
+      LIMIT 1
+    `);
     
     const enabled = result.rows.length > 0 ? result.rows[0].setting_value === 'true' : true;
+    console.log(`📊 Happy Hour status: ${enabled ? 'ENABLED' : 'DISABLED'}`);
     res.json({ enabled });
   } catch (error) {
     console.error('Error fetching happy hour settings:', error);
@@ -1949,17 +1953,25 @@ app.post('/api/settings/happy-hour', async (req, res) => {
   try {
     const { enabled } = req.body;
     
+    // Update both keys for backwards compatibility
     await query(`
       INSERT INTO restaurant_settings (setting_key, setting_value, description)
       VALUES ($1, $2, $3)
       ON CONFLICT (setting_key) 
       DO UPDATE SET setting_value = $2, updated_at = CURRENT_TIMESTAMP
-    `, ['happy_hour_enabled', enabled.toString(), 'Enable or disable happy hour feature']);
+    `, ['happyhour.enabled', enabled.toString(), 'Enable or disable happy hour feature']);
+    
+    // Also update old key if it exists
+    await query(`
+      UPDATE restaurant_settings 
+      SET setting_value = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE setting_key = 'happy_hour_enabled'
+    `, [enabled.toString()]);
     
     // Emit settings update to all connected clients
     io.emit('happyHourSettingsUpdated', { enabled });
     
-    console.log(`✅ Happy Hour ${enabled ? 'enabled' : 'disabled'}`);
+    console.log(`✅ Happy Hour ${enabled ? 'ENABLED' : 'DISABLED'}`);
     res.json({ success: true, enabled });
   } catch (error) {
     console.error('❌ Error updating happy hour settings:', error);
