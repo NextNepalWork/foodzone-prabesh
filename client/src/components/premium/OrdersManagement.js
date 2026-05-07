@@ -854,6 +854,7 @@ const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, 
 
   // Use timezone-aware formatters from useDateTimeFormatter hook
   const formatTime = (dateString) => {
+    console.log('🕐 Formatting time:', dateString, 'Result:', formatTimeWithTZ(dateString));
     return formatTimeWithTZ(dateString);
   };
 
