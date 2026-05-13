@@ -1628,6 +1628,42 @@ const OrderDetailsModal = ({ order, loading, onClose, onRefresh }) => {
                       {(order.delivery_address || order.address) && (
                         <p className="text-[10px] text-slate-600 mt-1 line-clamp-2">{order.delivery_address || order.address}</p>
                       )}
+                      {(order.delivery_latitude && order.delivery_longitude) && (
+                        <div className="flex gap-1 mt-2">
+                          <a
+                            href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-medium hover:bg-blue-700 text-center"
+                            title="Open location in Google Maps"
+                          >
+                            📍 View Location
+                          </a>
+                          <button
+                            onClick={() => {
+                              const mapsUrl = `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`;
+                              if (navigator.share) {
+                                navigator.share({
+                                  title: 'Delivery Location',
+                                  text: `Delivery location for order ${order.order_number}`,
+                                  url: mapsUrl
+                                }).catch(err => console.log('Share failed:', err));
+                              } else {
+                                navigator.clipboard.writeText(mapsUrl).then(() => {
+                                  alert('Location link copied to clipboard!');
+                                }).catch(err => {
+                                  console.error('Copy failed:', err);
+                                  alert('Failed to copy link');
+                                });
+                              }
+                            }}
+                            className="flex-1 px-2 py-1 bg-green-600 text-white rounded text-[10px] font-medium hover:bg-green-700"
+                            title="Share location link"
+                          >
+                            🔗 Share
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
