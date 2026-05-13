@@ -1103,6 +1103,9 @@ const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, 
               🖨️
             </button>
           )}
+          <button onClick={() => onDeleteOrder(order.id, order.order_number)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-[10px] font-medium hover:bg-red-200" title="Delete Order">
+            🗑️
+          </button>
         </div>
       </div>
     );
