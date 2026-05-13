@@ -1629,39 +1629,92 @@ const OrderDetailsModal = ({ order, loading, onClose, onRefresh }) => {
                         <p className="text-[10px] text-slate-600 mt-1 line-clamp-2">{order.delivery_address || order.address}</p>
                       )}
                       {(order.delivery_latitude && order.delivery_longitude) && (
-                        <div className="flex gap-1 mt-2">
-                          <a
-                            href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-medium hover:bg-blue-700 text-center"
-                            title="Open location in Google Maps"
-                          >
-                            📍 View Location
-                          </a>
-                          <button
-                            onClick={() => {
-                              const mapsUrl = `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`;
-                              if (navigator.share) {
-                                navigator.share({
-                                  title: 'Delivery Location',
-                                  text: `Delivery location for order ${order.order_number}`,
-                                  url: mapsUrl
-                                }).catch(err => console.log('Share failed:', err));
-                              } else {
+                        <div className="space-y-1 mt-2">
+                          <div className="flex gap-1">
+                            <a
+                              href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-medium hover:bg-blue-700 text-center"
+                              title="Open location in Google Maps"
+                            >
+                              📍 View Location
+                            </a>
+                            <button
+                              onClick={() => {
+                                const mapsUrl = `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`;
                                 navigator.clipboard.writeText(mapsUrl).then(() => {
-                                  alert('Location link copied to clipboard!');
+                                  alert('✅ Location link copied to clipboard!');
                                 }).catch(err => {
                                   console.error('Copy failed:', err);
-                                  alert('Failed to copy link');
+                                  alert('❌ Failed to copy link');
                                 });
-                              }
-                            }}
-                            className="flex-1 px-2 py-1 bg-green-600 text-white rounded text-[10px] font-medium hover:bg-green-700"
-                            title="Share location link"
-                          >
-                            🔗 Share
-                          </button>
+                              }}
+                              className="flex-1 px-2 py-1 bg-slate-600 text-white rounded text-[10px] font-medium hover:bg-slate-700"
+                              title="Copy location link"
+                            >
+                              📋 Copy Link
+                            </button>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                const mapsUrl = `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`;
+                                const shareText = `📍 Delivery Location for Order ${order.order_number}\n${order.customer_name}\n${order.customer_phone}\n${order.delivery_address || ''}\n\n${mapsUrl}`;
+                                
+                                if (navigator.share) {
+                                  // Use native share dialog (shows WhatsApp, Viber, etc. on mobile)
+                                  navigator.share({
+                                    title: `Delivery - Order ${order.order_number}`,
+                                    text: shareText
+                                  }).catch(err => {
+                                    if (err.name !== 'AbortError') {
+                                      console.log('Share failed:', err);
+                                    }
+                                  });
+                                } else {
+                                  // Fallback: copy to clipboard
+                                  navigator.clipboard.writeText(shareText).then(() => {
+                                    alert('✅ Location details copied to clipboard!\n\nYou can now paste it in WhatsApp, Viber, or any messaging app.');
+                                  }).catch(err => {
+                                    console.error('Copy failed:', err);
+                                    alert('Failed to copy');
+                                  });
+                                }
+                              }}
+                              className="flex-1 px-2 py-1 bg-green-600 text-white rounded text-[10px] font-medium hover:bg-green-700"
+                              title="Share via WhatsApp, Viber, SMS, etc."
+                            >
+                              🔗 Share
+                            </button>
+                            <a
+                              href={`https://wa.me/?text=${encodeURIComponent(`📍 Delivery Location\nOrder: ${order.order_number}\n${order.customer_name}\n${order.customer_phone}\n${order.delivery_address || ''}\n\nhttps://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 px-2 py-1 bg-[#25D366] text-white rounded text-[10px] font-medium hover:bg-[#20BA5A] text-center"
+                              title="Share via WhatsApp"
+                            >
+                              💬 WhatsApp
+                            </a>
+                          </div>
+                          <div className="flex gap-1">
+                            <a
+                              href={`viber://forward?text=${encodeURIComponent(`📍 Delivery Location\nOrder: ${order.order_number}\n${order.customer_name}\n${order.customer_phone}\n${order.delivery_address || ''}\n\nhttps://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 px-2 py-1 bg-[#7360F2] text-white rounded text-[10px] font-medium hover:bg-[#5F4FD1] text-center"
+                              title="Share via Viber"
+                            >
+                              📞 Viber
+                            </a>
+                            <a
+                              href={`sms:?body=${encodeURIComponent(`📍 Delivery Location\nOrder: ${order.order_number}\n${order.customer_name}\n${order.customer_phone}\n${order.delivery_address || ''}\n\nhttps://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`)}`}
+                              className="flex-1 px-2 py-1 bg-orange-600 text-white rounded text-[10px] font-medium hover:bg-orange-700 text-center"
+                              title="Share via SMS"
+                            >
+                              💬 SMS
+                            </a>
+                          </div>
                         </div>
                       )}
                     </>
