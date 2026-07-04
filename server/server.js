@@ -4587,18 +4587,6 @@ app.post('/api/daybook/open-day', async (req, res) => {
   }
 });
 
-// Catch-all handler for React routing in production (must be before error handlers)
-if (process.env.NODE_ENV === 'production') {
-  app.get('*', (req, res) => {
-    // Only serve index.html for non-API routes
-    if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    } else {
-      res.status(404).json({ error: 'API endpoint not found' });
-    }
-  });
-}
-
 // ============ TABLE CALLS ENDPOINTS ============
 
 // Create a table call (from client/table)
@@ -4836,6 +4824,18 @@ app.get('/api/contact/messages', authenticateToken, requireStaffRole([STAFF_ROLE
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
+
+// Catch-all handler for React routing in production (must be after ALL API routes, before error handlers)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    // Only serve index.html for non-API routes
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    } else {
+      res.status(404).json({ error: 'API endpoint not found' });
+    }
+  });
+}
 
 // Error handling middleware (must be last)
 app.use(notFoundHandler);
