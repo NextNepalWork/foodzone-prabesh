@@ -61,6 +61,18 @@ const Icon = ({ name, className = 'w-6 h-6' }) => {
       return (
         <svg {...common}><path d="M9 6l6 6-6 6" /></svg>
       );
+    case 'music':
+      return (
+        <svg {...common}><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></svg>
+      );
+    case 'calendar':
+      return (
+        <svg {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+      );
+    case 'cake':
+      return (
+        <svg {...common}><path d="M4 21v-7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7" /><path d="M4 17h16" /><path d="M12 12V8M9 8c0-1.5 1-2 1-3s-.5-2-1-2M15 8c0-1.5-1-2-1-3s.5-2 1-2" /></svg>
+      );
     default:
       return null;
   }
@@ -213,8 +225,15 @@ const Homepage = () => {
     <div className="min-h-screen bg-white">
       {/* Hero */}
       <section
-        className="relative -mt-32 pt-32 pb-16 text-white bg-cover bg-center"
-        style={{ backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 55%, rgba(10,10,10,0.94) 100%), url('/images/hero/hero-storefront-real.jpg')" }}
+        className="relative -mt-32 pt-32 pb-16 text-white bg-cover"
+        style={{
+          backgroundPosition: '75% center',
+          backgroundImage:
+            "linear-gradient(90deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 30%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.15) 100%)," +
+            "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 55%, rgba(8,8,8,0.95) 100%)," +
+            "url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22 stitchTiles=%22stitch%22/><feColorMatrix type=%22saturate%22 values=%220%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.05%22/></svg>')," +
+            "url('/images/hero/hero-storefront-real.jpg')",
+        }}
       >
         <div className="container mx-auto px-6 relative z-10 pt-16 pb-8">
           <Eyebrow>Welcome to</Eyebrow>
@@ -319,6 +338,56 @@ const Homepage = () => {
         </div>
       </section>
 
+      {/* Live Music */}
+      <section className="py-20 bg-neutral-950 text-white border-t border-white/10">
+        <div className="container mx-auto px-6">
+          <div className="max-w-3xl mx-auto text-center">
+            <Icon name="music" className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+            <Eyebrow>This Friday, 5–8 PM</Eyebrow>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Live Music Night</h2>
+            <p className="text-white/60 mb-8">
+              Join us for an evening of live music, good food and great company — full menu and beverages available all night.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3 mb-8 text-sm">
+              {['Live Band', 'Full Menu', 'Beverages', 'Family Friendly'].map((t) => (
+                <span key={t} className="border border-white/20 rounded-full px-4 py-1.5 text-white/80">{t}</span>
+              ))}
+            </div>
+            <a href={`tel:${restaurantInfo.phone}`} className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-6 py-3 rounded-lg transition-colors">
+              <Icon name="phone" className="w-5 h-5" /> Reserve Your Table
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Private Events */}
+      <section className="py-20 bg-neutral-50">
+        <div className="container mx-auto px-6">
+          <SectionHeading eyebrow="Celebrate with us" title="Private Events & Group Dining" subtitle="Up to 50 guests — perfect for birthdays, family gatherings and corporate events." />
+          <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            {[
+              ['cake', 'Birthday Parties', 'Decorations and cake arrangements on request'],
+              ['users', 'Family Gatherings', 'Comfortable seating for large groups'],
+              ['calendar', 'Corporate Events', 'A professional setting for meetings and team events'],
+              ['sparkle', 'Celebrations', 'Anniversaries, graduations and milestones'],
+            ].map(([icon, title, body]) => (
+              <div key={title} className="bg-white rounded-2xl p-6 text-center border border-neutral-200 shadow-sm">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center">
+                  <Icon name={icon} className="w-6 h-6 text-amber-600" />
+                </div>
+                <h4 className="font-semibold text-neutral-900 mb-1">{title}</h4>
+                <p className="text-sm text-neutral-500">{body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-10">
+            <a href={`tel:${restaurantInfo.phone}`} className="inline-flex items-center gap-2 bg-primary hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+              <Icon name="phone" className="w-5 h-5" /> Call to Reserve
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* About */}
       <section className="py-20 bg-neutral-950 text-white">
         <div className="container mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
@@ -326,12 +395,13 @@ const Homepage = () => {
             <Eyebrow>Our story</Eyebrow>
             <h2 className="text-3xl md:text-4xl font-bold mb-6">About {restaurantInfo.name}</h2>
             <p className="text-white/70 leading-relaxed mb-4">
-              {restaurantInfo.name} has been serving the community with a menu that spans Tibetan, Continental
-              and Indian dishes alongside pizzas, burgers, momos and flavourful curries — all made fresh, every day.
+              Located at {restaurantInfo.address}, {restaurantInfo.name} has been serving Duwakot and the wider
+              Bhaktapur community with a menu that spans Tibetan, Continental and Indian dishes alongside pizzas,
+              burgers, momos and flavourful curries — all made fresh, every day.
             </p>
             <p className="text-white/70 leading-relaxed">
-              Order at your table by scanning the QR code, or have it delivered straight to your door —
-              either way, the same quality you'd expect sitting in our dining room.
+              Order at your table by scanning the QR code, or get fast food delivery anywhere in Duwakot and
+              Bhaktapur — either way, the same quality you'd expect sitting in our dining room.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
