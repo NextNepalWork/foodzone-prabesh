@@ -1,7 +1,7 @@
 // Food Zone PWA Service Worker - Enhanced for Instant Table Loading
-const CACHE_NAME = 'food-zone-v2.8.0';
-const API_CACHE = 'food-zone-api-v2.8';
-const TABLE_CACHE = 'food-zone-table-v2.8';
+const CACHE_NAME = 'food-zone-v2.9.0';
+const API_CACHE = 'food-zone-api-v2.9';
+const TABLE_CACHE = 'food-zone-table-v2.9';
 
 // Global variables
 let keepAliveInterval = null;
@@ -169,6 +169,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Settings must always reflect the latest admin changes — use network-first
+  // (fall back to cache only when offline) so address/hours/etc. propagate
+  // immediately instead of being served stale from the cache-first path below.
+  if (url.pathname.startsWith('/api/settings')) {
+    event.respondWith(
+      fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.ok && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(API_CACHE).then(cache => cache.put(event.request, copy));
+        }
+        return networkResponse;
+      }).catch(() => caches.open(API_CACHE).then(cache => cache.match(event.request)))
+    );
+    return;
+  }
+
   // Handle API requests with cache-first strategy for instant loading
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(

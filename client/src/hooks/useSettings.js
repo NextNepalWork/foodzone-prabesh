@@ -106,7 +106,7 @@ export function useTableCount() {
 // Hook for restaurant info
 export function useRestaurantInfo() {
   const [info, setInfo] = useState(settingsService.getRestaurantInfo());
-  
+
   useEffect(() => {
     const unsubscribe = settingsService.subscribe(() => {
       setInfo(settingsService.getRestaurantInfo());
@@ -114,6 +114,13 @@ export function useRestaurantInfo() {
 
     if (settingsService.isLoaded()) {
       setInfo(settingsService.getRestaurantInfo());
+    } else {
+      // Trigger a load if nothing else has — otherwise this hook would sit on
+      // hardcoded defaults (e.g. "Kathmandu") forever on pages that don't
+      // otherwise call useSettings().
+      settingsService.loadSettings().then(() => {
+        setInfo(settingsService.getRestaurantInfo());
+      });
     }
 
     return unsubscribe;

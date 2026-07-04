@@ -256,17 +256,29 @@ const Homepage = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section
-        className="relative -mt-32 pt-32 pb-16 text-white bg-cover"
-        style={{
-          backgroundPosition: '100% center',
-          backgroundImage:
-            "linear-gradient(90deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 30%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.15) 100%)," +
-            "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 55%, rgba(8,8,8,0.95) 100%)," +
-            "url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22 stitchTiles=%22stitch%22/><feColorMatrix type=%22saturate%22 values=%220%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.05%22/></svg>')," +
-            "url('/images/hero/hero-storefront-real.jpg')",
-        }}
-      >
+      <section className="relative -mt-32 pt-32 pb-16 text-white bg-neutral-950 overflow-hidden">
+        {/* Photo panel — pinned to the right, black text zone on the left */}
+        <div className="absolute inset-0" aria-hidden="true">
+          <img
+            src="/images/hero/hero-storefront-real.jpg"
+            alt="Food Zone Restaurant storefront at dusk in Duwakot, Bhaktapur"
+            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-center"
+          />
+          {/* Fade the photo's left edge into the black text zone */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(90deg, rgb(10,10,10) 0%, rgb(10,10,10) 34%, rgba(10,10,10,0.85) 46%, rgba(10,10,10,0.25) 70%, rgba(10,10,10,0.35) 100%)',
+            }}
+          />
+          {/* Gentle top + bottom vignette so headers/footers stay legible */}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 35%, rgba(10,10,10,0.75) 100%)' }}
+          />
+        </div>
+
         <div className="container mx-auto px-6 relative z-10 pt-16 pb-8">
           <Eyebrow>Welcome to</Eyebrow>
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-none mb-2">
