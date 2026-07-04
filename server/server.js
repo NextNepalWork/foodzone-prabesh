@@ -4814,6 +4814,25 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+// Send a test email to verify SMTP is working (admin only)
+app.post('/api/admin/test-email', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER]), async (req, res) => {
+  try {
+    const { to } = req.body || {};
+    if (!to) return res.status(400).json({ error: 'to is required' });
+    if (!smtpConfigured) return res.status(503).json({ error: 'SMTP is not configured on this server' });
+
+    await sendEmail({
+      to,
+      subject: '✅ Food Zone SMTP Test',
+      html: '<h2>SMTP is working!</h2><p>This is a test email sent from the Food Zone backend to confirm the Hostinger SMTP connection is set up correctly.</p>',
+    });
+    res.json({ success: true, message: `Test email sent to ${to}` });
+  } catch (error) {
+    console.error('❌ Test email failed:', error);
+    res.status(500).json({ error: 'Failed to send test email', details: error.message });
+  }
+});
+
 // List contact / booking enquiries (admin)
 app.get('/api/contact/messages', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER]), async (req, res) => {
   try {
