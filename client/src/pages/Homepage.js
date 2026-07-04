@@ -262,9 +262,9 @@ const Homepage = () => {
           <img
             src="/images/hero/hero-storefront-real.jpg"
             alt="Food Zone Restaurant storefront at dusk in Duwakot, Bhaktapur"
-            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-[72%_center] md:object-center"
+            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-[88%_center] md:object-center"
           />
-          {/* Fade the photo's left edge into the black text zone (desktop) */}
+          {/* Desktop: fade the photo's left edge into the black text zone */}
           <div
             className="absolute inset-0 hidden md:block"
             style={{
@@ -272,16 +272,22 @@ const Homepage = () => {
                 'linear-gradient(90deg, rgb(10,10,10) 0%, rgb(10,10,10) 34%, rgba(10,10,10,0.85) 46%, rgba(10,10,10,0.25) 70%, rgba(10,10,10,0.35) 100%)',
             }}
           />
-          {/* Mobile: uniform darkening so text stays legible over the full-width photo */}
-          <div className="absolute inset-0 md:hidden bg-black/60" />
+          {/* Mobile: solid black behind the text (left), photo revealed on the right */}
+          <div
+            className="absolute inset-0 md:hidden"
+            style={{
+              background:
+                'linear-gradient(90deg, rgb(10,10,10) 0%, rgb(10,10,10) 50%, rgba(10,10,10,0.7) 72%, rgba(10,10,10,0.35) 100%)',
+            }}
+          />
           {/* Gentle top + bottom vignette so headers/footers stay legible */}
           <div
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 35%, rgba(10,10,10,0.8) 100%)' }}
+            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 40%, rgba(10,10,10,0.85) 100%)' }}
           />
         </div>
 
-        <div className="container mx-auto px-5 sm:px-6 relative z-10 pt-24 md:pt-16 pb-8">
+        <div className="container mx-auto px-5 sm:px-6 relative z-10 pt-24 md:pt-16 pb-8 [text-shadow:0_1px_12px_rgba(0,0,0,0.55)] md:[text-shadow:none]">
           <Eyebrow>Welcome to</Eyebrow>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-none mb-2">
             {restaurantInfo.name}
