@@ -269,25 +269,21 @@ const DeliveryCart = () => {
         </div>
       )}
 
-      {/* Prominent Menu Banner */}
-      <div className="bg-gradient-to-r from-yellow-300 via-amber-400 to-red-500 rounded-2xl p-8 mb-8 text-center shadow-2xl transform hover:scale-105 transition-all duration-300 animate-pulse hover:animate-none">
-        <div className="flex items-center justify-center space-x-6">
-          <span className="text-6xl animate-bounce">🍽️</span>
-          <div>
-            <h2 className="text-3xl font-extrabold text-white mb-3">🌟 BROWSE FULL MENU 🌟</h2>
-            <p className="text-lg text-white mb-4 opacity-90">Discover more delicious items to add to your order!</p>
-            <Link 
-              to="/menu"
-              className="bg-white text-amber-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all duration-300 font-extrabold text-xl shadow-lg hover:shadow-xl transform hover:scale-110 inline-flex items-center space-x-3"
-            >
-              <span className="text-2xl">📋</span>
-              <span>Browse Full Menu</span>
-            </Link>
-          </div>
+      {/* Browse menu link */}
+      <div className="flex items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-4 mb-8 shadow-sm">
+        <div>
+          <div className="font-semibold text-slate-800">Want to add more?</div>
+          <div className="text-sm text-slate-500">Browse the full menu to add items to your order.</div>
         </div>
+        <Link
+          to="/menu"
+          className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+        >
+          Browse Menu
+        </Link>
       </div>
-      
-      <h1 className="text-3xl font-bold text-center mb-8">🚚 Delivery Order</h1>
+
+      <h1 className="text-2xl font-bold text-center mb-8">Delivery Order</h1>
 
       {/* Delivery Cart Items */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">

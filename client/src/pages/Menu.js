@@ -483,72 +483,26 @@ const Menu = () => {
         </div>
       )}
 
-      {/* Menu Items by Category */}
+      {/* Menu Items — flat list (table-page style) */}
       {displayedItems.length > 0 && (
-        <div className="space-y-8">
-          {selectedCategory === 'All' ? (
-            // Show all categories with subheadings
-            categories.filter(cat => cat !== 'All').map(category => {
-              const categoryItems = displayedItems.filter(item => item.category === category);
-              if (categoryItems.length === 0) return null;
-              
-              return (
-                <div key={category} className="space-y-4">
-                  {/* Category Subheading */}
-                  <div className="border-b border-gray-200 pb-2">
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                      <span className="text-primary">
-                        {category === 'Appetizers' && '🥗'}
-                        {category === 'Main Course' && '🍛'}
-                        {category === 'Beverages' && '🥤'}
-                        {category === 'Desserts' && '🍰'}
-                        {category === 'Snacks' && '🍿'}
-                        {category === 'Specials' && '⭐'}
-                        {!['Appetizers', 'Main Course', 'Beverages', 'Desserts', 'Snacks', 'Specials'].includes(category) && '🍽️'}
-                      </span>
-                      {category}
-                      <span className="text-sm font-normal text-gray-500">({filteredItems.filter(item => item.category === category).length} items)</span>
-                    </h2>
-                  </div>
-                  
-                  {/* Category Items Grid */}
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {categoryItems.map(item => (
-                      <Suspense key={item.id} fallback={<div className="h-64 bg-gray-100 rounded-2xl animate-pulse"></div>}>
-                        <MenuItemCard 
-                          item={item}
-                          quantity={getItemQuantity(item.id)}
-                          onAddToCart={handleAddToCart}
-                          onUpdateQuantity={handleUpdateQuantity}
-                          isTableCustomer={isTableCustomer}
-                          currentTable={currentTable}
-                          isHappyHour={isHappyHour}
-                        />
-                      </Suspense>
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            // Show single category without subheading
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4 max-w-2xl mx-auto">
+          <Suspense fallback={<div className="h-40 bg-gray-100 rounded-2xl animate-pulse"></div>}>
+            <ul className="space-y-2.5">
               {displayedItems.map(item => (
-                <Suspense key={item.id} fallback={<div className="h-64 bg-gray-100 rounded-2xl animate-pulse"></div>}>
-                  <MenuItemCard 
-                    item={item}
-                    quantity={getItemQuantity(item.id)}
-                    onAddToCart={handleAddToCart}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    isTableCustomer={isTableCustomer}
-                    currentTable={currentTable}
-                    isHappyHour={isHappyHour}
-                  />
-                </Suspense>
+                <MenuItemCard
+                  key={item.id}
+                  item={item}
+                  quantity={getItemQuantity(item.id)}
+                  onAddToCart={handleAddToCart}
+                  onUpdateQuantity={handleUpdateQuantity}
+                  isTableCustomer={isTableCustomer}
+                  currentTable={currentTable}
+                  isHappyHour={isHappyHour}
+                />
               ))}
-            </div>
-          )}
-          
+            </ul>
+          </Suspense>
+
           {/* Load More Button */}
           {hasMoreItems && (
             <div ref={loadMoreRef} className="text-center mt-6">
