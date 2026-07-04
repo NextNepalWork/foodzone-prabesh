@@ -10,6 +10,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
+const webpush = require('web-push');
+const { sendEmail, smtpConfigured } = require('./utils/email');
 
 // Load environment variables first
 require('dotenv').config();
@@ -61,6 +63,45 @@ const io = socketIo(server, {
 });
 // Expose io to routes via app locals
 app.set('io', io);
+
+// Configure Web Push (VAPID) for real push notifications (works even when app is closed / screen locked)
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@foodzone.com.np';
+const pushEnabled = !!(vapidPublicKey && vapidPrivateKey);
+if (pushEnabled) {
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  console.log('✅ Web Push configured');
+} else {
+  console.warn('⚠️ VAPID keys not set — push notifications disabled (socket.io realtime still works)');
+}
+
+// Send a push notification to every stored subscription (kitchen/staff devices)
+async function sendPushToAll(payload) {
+  if (!pushEnabled) return;
+  try {
+    const { rows } = await query('SELECT * FROM push_subscriptions');
+    const body = JSON.stringify(payload);
+    await Promise.all(rows.map(async (row) => {
+      const subscription = {
+        endpoint: row.endpoint,
+        keys: { p256dh: row.p256dh, auth: row.auth }
+      };
+      try {
+        await webpush.sendNotification(subscription, body);
+      } catch (error) {
+        // Subscription expired or invalid — remove it
+        if (error.statusCode === 404 || error.statusCode === 410) {
+          await query('DELETE FROM push_subscriptions WHERE endpoint = $1', [row.endpoint]).catch(() => {});
+        } else {
+          console.warn('⚠️ Push send failed for a subscription:', error.message);
+        }
+      }
+    }));
+  } catch (error) {
+    console.error('❌ Error sending push notifications:', error.message);
+  }
+}
 
 // Apply security middleware first
 app.use(securityHeaders);
@@ -429,7 +470,37 @@ async function loadSettings() {
         notes TEXT
       )
     `);
-    
+
+    // Create contact_messages table for website enquiries / booking requests
+    await query(`
+      CREATE TABLE IF NOT EXISTS contact_messages (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(20) DEFAULT 'enquiry',
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        message TEXT,
+        booking_date DATE,
+        booking_time VARCHAR(20),
+        guests INTEGER,
+        status VARCHAR(20) DEFAULT 'new',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create push_subscriptions table for Web Push (PWA notifications on locked screen)
+    await query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        endpoint TEXT UNIQUE NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        role VARCHAR(50) DEFAULT 'staff',
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const result = await query('SELECT setting_key, setting_value FROM restaurant_settings');
     result.rows.forEach(row => {
       if (row.setting_key === 'table_count' || row.setting_key === 'tables.table_count') {
@@ -1071,7 +1142,18 @@ app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (re
 
     // Emit new order to all connected clients
     io.emit('newOrder', order);
-    
+
+    // Send push notification (works even when app is closed / screen locked)
+    const orderLabel = order.table_id ? `Table ${order.table_id}` : (order.order_type === 'delivery' ? 'Delivery' : 'Takeaway');
+    sendPushToAll({
+      title: '🍽️ Food Zone - New Order!',
+      body: `${orderLabel} - NPR ${order.total_amount || order.total || 0}`,
+      orderType: 'NEW_ORDER',
+      orderId: order.id,
+      tableId: order.table_id,
+      totalAmount: order.total_amount || order.total || 0
+    });
+
     console.log('✅ New order created:', order.order_number);
     res.json({ success: true, order });
     
@@ -4641,6 +4723,117 @@ app.put('/api/table-calls/:callId/resolve', authenticateToken, requireStaffRole(
   } catch (error) {
     console.error('❌ Error resolving call:', error);
     res.status(500).json({ error: 'Failed to resolve call' });
+  }
+});
+
+// Web Push: expose VAPID public key to the frontend
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: vapidPublicKey || null, enabled: pushEnabled });
+});
+
+// Web Push: save a browser's push subscription (kitchen/staff device)
+app.post('/api/push/subscribe', async (req, res) => {
+  try {
+    const { subscription, role } = req.body;
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+
+    await query(
+      `INSERT INTO push_subscriptions (endpoint, p256dh, auth, role, user_agent)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (endpoint) DO UPDATE SET p256dh = $2, auth = $3, role = $4, user_agent = $5`,
+      [subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth, role || 'staff', req.headers['user-agent'] || null]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error saving push subscription:', error);
+    res.status(500).json({ error: 'Failed to save subscription' });
+  }
+});
+
+// Web Push: remove a subscription (e.g. on logout)
+app.post('/api/push/unsubscribe', async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) return res.status(400).json({ error: 'endpoint is required' });
+    await query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error removing push subscription:', error);
+    res.status(500).json({ error: 'Failed to remove subscription' });
+  }
+});
+
+// Website contact / table booking enquiries
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { type = 'enquiry', name, email, phone, message, date, time, guests } = req.body || {};
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    if (!phone && !email) {
+      return res.status(400).json({ error: 'Phone or email is required' });
+    }
+
+    const result = await query(
+      `INSERT INTO contact_messages (type, name, email, phone, message, booking_date, booking_time, guests)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        type === 'booking' ? 'booking' : 'enquiry',
+        name.trim(),
+        email || null,
+        phone || null,
+        message || null,
+        date || null,
+        time || null,
+        guests ? parseInt(guests, 10) : null,
+      ]
+    );
+    const entry = result.rows[0];
+
+    const notifyEmail = process.env.BOOKING_NOTIFY_EMAIL;
+    if (smtpConfigured && notifyEmail) {
+      const isBooking = entry.type === 'booking';
+      const subject = isBooking
+        ? `🍽️ New Table Booking Request from ${entry.name}`
+        : `📩 New Enquiry from ${entry.name}`;
+      const html = `
+        <h2>${isBooking ? 'New Table Booking Request' : 'New Website Enquiry'}</h2>
+        <p><strong>Name:</strong> ${entry.name}</p>
+        ${entry.phone ? `<p><strong>Phone:</strong> ${entry.phone}</p>` : ''}
+        ${entry.email ? `<p><strong>Email:</strong> ${entry.email}</p>` : ''}
+        ${isBooking ? `<p><strong>Date:</strong> ${entry.booking_date || '-'}</p>` : ''}
+        ${isBooking ? `<p><strong>Time:</strong> ${entry.booking_time || '-'}</p>` : ''}
+        ${isBooking ? `<p><strong>Guests:</strong> ${entry.guests || '-'}</p>` : ''}
+        ${entry.message ? `<p><strong>Message:</strong><br/>${entry.message.replace(/\n/g, '<br/>')}</p>` : ''}
+        <hr/>
+        <p style="color:#888;font-size:12px;">Sent from the Food Zone website contact form.</p>
+      `;
+      // Fire-and-forget: don't block the customer's response on email delivery
+      sendEmail({ to: notifyEmail, subject, html, replyTo: entry.email || undefined }).catch((err) => {
+        console.error('❌ Failed to send contact notification email:', err.message);
+      });
+    }
+
+    res.json({ success: true, message: 'Thank you! We will get back to you shortly.' });
+  } catch (error) {
+    console.error('❌ Error saving contact message:', error);
+    res.status(500).json({ error: 'Failed to submit your request. Please try again.' });
+  }
+});
+
+// List contact / booking enquiries (admin)
+app.get('/api/contact/messages', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER]), async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM contact_messages ORDER BY created_at DESC LIMIT 200');
+    res.json({ success: true, messages: result.rows });
+  } catch (error) {
+    console.error('❌ Error fetching contact messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
 

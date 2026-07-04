@@ -63,7 +63,7 @@ self.addEventListener('install', (event) => {
       caches.open(API_CACHE).then(cache => {
         return Promise.all(
           CRITICAL_API_ENDPOINTS.map(endpoint => {
-            return fetch(`http://localhost:3000${endpoint}`)
+            return fetch(endpoint)
               .then(response => {
                 if (response.ok) {
                   cache.put(endpoint, response.clone());
@@ -156,7 +156,13 @@ function startKeepAlive() {
 // Enhanced fetch handler for instant table loading
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  
+
+  // Only handle http(s) requests — chrome-extension://, ws://, blob:, etc.
+  // throw on cache.put() and clutter the console.
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
   // Skip caching for POST, PUT, DELETE requests
   if (event.request.method !== 'GET') {
     event.respondWith(fetch(event.request));

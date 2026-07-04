@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import { getSocketUrl } from '../config/api';
+import PushNotificationManager from '../utils/pushNotifications';
 
 import './mobile-admin.css';
 
@@ -84,6 +85,16 @@ const MobileAdminApp = () => {
     } catch (_) {}
     window.location.reload();
   };
+
+  // --- Push notifications: subscribe so kitchen/staff get alerts even when the app is closed / screen locked ---
+  useEffect(() => {
+    if (!isAuthed) return;
+    if (Notification.permission === 'denied') return;
+    const manager = new PushNotificationManager();
+    manager.initialize().catch((err) => {
+      console.warn('Push notifications not initialized:', err.message);
+    });
+  }, [isAuthed]);
 
   // --- Auth expiry (fired by apiService on a 401) ---------------------
   useEffect(() => {

@@ -1,130 +1,142 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useRestaurantInfo } from '../hooks/useSettings';
+import { fetchApi } from '../services/apiService';
+
+const BookingForm = () => {
+  const [form, setForm] = useState({ name: '', phone: '', email: '', date: '', time: '', guests: '', message: '' });
+  const [status, setStatus] = useState('idle'); // idle | sending | sent | error
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || (!form.phone.trim() && !form.email.trim())) {
+      setStatus('error');
+      return;
+    }
+    setStatus('sending');
+    try {
+      await fetchApi.post('/api/contact', { type: 'booking', ...form });
+      setStatus('sent');
+      setForm({ name: '', phone: '', email: '', date: '', time: '', guests: '', message: '' });
+    } catch (err) {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto text-left">
+      <input required placeholder="Your name *" value={form.name} onChange={set('name')}
+        className="px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      <input placeholder="Phone" value={form.phone} onChange={set('phone')}
+        className="px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      <input type="email" placeholder="Email" value={form.email} onChange={set('email')}
+        className="px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      <input type="number" min="1" placeholder="Guests" value={form.guests} onChange={set('guests')}
+        className="px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      <input type="date" value={form.date} onChange={set('date')}
+        className="px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      <input type="time" value={form.time} onChange={set('time')}
+        className="px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      <textarea placeholder="Anything we should know? (occasion, seating preference, allergies...)"
+        value={form.message} onChange={set('message')} rows={3}
+        className="md:col-span-2 px-4 py-3 rounded-lg bg-white/5 border border-white/15 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+
+      <div className="md:col-span-2 flex items-center gap-4">
+        <button type="submit" disabled={status === 'sending'}
+          className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-black font-semibold px-8 py-3 rounded-lg transition-colors">
+          {status === 'sending' ? 'Sending…' : 'Request Booking'}
+        </button>
+        {status === 'sent' && <span className="text-green-400 text-sm">✅ Thanks! We'll confirm shortly by phone.</span>}
+        {status === 'error' && <span className="text-red-400 text-sm">Please fill in your name and phone/email.</span>}
+      </div>
+    </form>
+  );
+};
 
 const Homepage = () => {
   // Get dynamic restaurant info
   const restaurantInfo = useRestaurantInfo();
   return (
     <div className="min-h-screen">
-      {/* Hero Section - Website Launch */}
-      <section className="bg-gradient-to-br from-indigo-900 via-purple-800 to-pink-700 text-white pt-0 pb-24 relative overflow-hidden -mt-32">
-        <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-        
-        {/* Animated Background Elements */}
-        <div className="absolute top-10 left-10 animate-bounce delay-100">
-          <span className="text-6xl opacity-30">📱</span>
+      {/* Hero Section */}
+      <section
+        className="relative -mt-32 pt-32 pb-16 text-white bg-cover bg-center"
+        style={{ backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 55%, rgba(10,10,10,0.92) 100%), url('/images/hero/hero-storefront.png')" }}
+      >
+        <div className="container mx-auto px-6 relative z-10 pt-16 pb-8">
+          <p className="font-serif italic text-amber-300 text-2xl md:text-3xl mb-2">Welcome to</p>
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-none mb-2">
+            {restaurantInfo.name}
+          </h1>
+          <p className="font-serif italic text-2xl md:text-3xl text-amber-200 mb-6">
+            {restaurantInfo.tagline || 'Cafe Restaurant'}
+          </p>
+          <p className="text-lg md:text-xl text-white/90 max-w-xl mb-8">
+            Good food. Great taste. Unforgettable moments.
+          </p>
+
+          <div className="flex flex-wrap gap-4 mb-12">
+            <Link
+              to="/menu"
+              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-6 py-3 rounded-lg transition-colors"
+            >
+              🍴 View Menu
+            </Link>
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(restaurantInfo.address || restaurantInfo.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 border border-white/50 hover:border-white text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+            >
+              📍 Find Us
+            </a>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-2xl mb-12 text-sm">
+            <div className="flex flex-col items-center text-center gap-2">
+              <span className="text-2xl">🍽️</span>
+              <span className="text-white/80">Delicious Food</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-2">
+              <span className="text-2xl">❤️</span>
+              <span className="text-white/80">Made with Love</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-2">
+              <span className="text-2xl">🌿</span>
+              <span className="text-white/80">Fresh Ingredients</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-2">
+              <span className="text-2xl">👥</span>
+              <span className="text-white/80">Warm Atmosphere</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/80 border-t border-white/15 pt-6">
+            <span className="flex items-center gap-2">📍 {restaurantInfo.address}</span>
+            <span className="flex items-center gap-2">📞 {restaurantInfo.phone}</span>
+            <span className="flex items-center gap-2">🕐 Daily: 7:30 AM - 10:30 PM</span>
+          </div>
         </div>
-        <div className="absolute top-20 right-20 animate-bounce delay-300">
-          <span className="text-5xl opacity-40">🍽️</span>
-        </div>
-        <div className="absolute bottom-20 left-16 animate-bounce delay-500">
-          <span className="text-4xl opacity-30">🚚</span>
-        </div>
-        <div className="absolute bottom-10 right-12 animate-bounce delay-700">
-          <span className="text-5xl opacity-40">💻</span>
-        </div>
-        
-        <div className="container mx-auto px-4 text-center relative z-10 pt-24">
-          <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-6 py-2 rounded-full font-bold text-lg mb-4 animate-pulse">
-              🚀 EXCLUSIVE WEBSITE LAUNCH! 🚀
-            </div>
-            <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-yellow-200 via-pink-200 to-blue-200 bg-clip-text text-transparent">
-              Eat with {restaurantInfo.name}
-            </h1>
-            <h2 className="text-3xl md:text-4xl font-semibold mb-6 text-yellow-200">
-              📱 Through Your Mobile!
-            </h2>
-          </div>
-          
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-3xl p-8 max-w-5xl mx-auto border-2 border-white border-opacity-30 mb-8">
-            <p className="text-2xl md:text-3xl font-medium mb-6 leading-relaxed">
-              🌟 <span className="text-yellow-300 font-bold">{restaurantInfo.name} Website</span> allows you to order and eat 
-              <span className="text-green-300 font-bold"> both inside the restaurant</span> and 
-              <span className="text-blue-300 font-bold"> get deliveries from outside</span> the restaurant! 🌟
-            </p>
-            
-            <div className="grid md:grid-cols-2 gap-8 mb-8">
-              <div className="bg-white bg-opacity-10 rounded-2xl p-6 border border-white border-opacity-20">
-                <div className="text-4xl mb-4">🏪</div>
-                <h3 className="text-2xl font-bold mb-3 text-yellow-200">Dine-In Experience</h3>
-                <p className="text-lg">
-                  📱 Scan QR code at your table<br/>
-                  🍽️ Browse menu on your phone<br/>
-                  ✨ Order instantly without waiting<br/>
-                  💳 Pay digitally or cash
-                </p>
-              </div>
-              
-              <div className="bg-white bg-opacity-10 rounded-2xl p-6 border border-white border-opacity-20">
-                <div className="text-4xl mb-4">🚚</div>
-                <h3 className="text-2xl font-bold mb-3 text-blue-200">Delivery Service</h3>
-                <p className="text-lg">
-                  📍 GPS location tracking<br/>
-                  🛵 Fast delivery to your door<br/>
-                  📞 Real-time order updates
-                </p>
-              </div>
-            </div>
-            
-            <div className="text-center">
-              <h3 className="text-2xl font-bold mb-4 text-pink-200">🎯 Revolutionary Features</h3>
-              <div className="flex flex-wrap justify-center gap-4 mb-6">
-                <span className="bg-green-500 px-4 py-2 rounded-full font-bold">📱 Mobile First</span>
-                <span className="bg-blue-500 px-4 py-2 rounded-full font-bold">🔄 Real-time Orders</span>
-                <span className="bg-purple-500 px-4 py-2 rounded-full font-bold">📍 GPS Tracking</span>
-                <span className="bg-red-500 px-4 py-2 rounded-full font-bold">⚡ Instant Service</span>
-                <span className="bg-yellow-500 text-black px-4 py-2 rounded-full font-bold">💎 Premium Experience</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-4 mb-8">
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link 
-                to="/menu" 
-                className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-8 py-4 rounded-full font-bold text-xl hover:from-yellow-400 hover:to-orange-400 transition-all transform hover:scale-105 shadow-lg"
-              >
-                🍽️ Explore Our Menu
-              </Link>
-              <Link 
-                to="/delivery-cart" 
-                className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-8 py-4 rounded-full font-bold text-xl hover:from-green-400 hover:to-blue-400 transition-all transform hover:scale-105 shadow-lg"
-              >
-                🚚 Order Delivery Now
-              </Link>
-            </div>
-            <p className="text-lg text-yellow-200">
-              ✨ <strong>Digital Restaurant Experience!</strong> Complete mobile ordering system
-            </p>
-          </div>
-          
-          <div className="bg-white bg-opacity-5 rounded-2xl p-6 max-w-3xl mx-auto">
-            <div className="grid md:grid-cols-3 gap-4 text-lg">
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">📍</span>
-                <span>{restaurantInfo.address}</span>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">📞</span>
-                <span>{restaurantInfo.phone}</span>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">🕐</span>
-                <span>Daily: 7:30 AM - 10:30 PM</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-8">
-            <div className="animate-bounce">
-              <span className="text-4xl">⬇️</span>
-            </div>
-            <p className="text-xl text-yellow-200 mt-2">
-              Discover the future of dining below!
-            </p>
-          </div>
+      </section>
+
+      {/* Quick actions */}
+      <section className="bg-neutral-950 text-white py-8 border-b border-white/10">
+        <div className="container mx-auto px-6 flex flex-wrap justify-center gap-4">
+          <Link
+            to="/menu"
+            className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-6 py-4 text-center transition-colors"
+          >
+            <div className="text-2xl mb-1">🍽️</div>
+            <div className="font-semibold">Browse Menu</div>
+          </Link>
+          <Link
+            to="/delivery-cart"
+            className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-6 py-4 text-center transition-colors"
+          >
+            <div className="text-2xl mb-1">🚚</div>
+            <div className="font-semibold">Order Delivery</div>
+          </Link>
         </div>
       </section>
 
@@ -830,6 +842,16 @@ const Homepage = () => {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Booking / Enquiry */}
+      <section className="py-16 bg-neutral-950 text-white border-t border-white/10">
+        <div className="container mx-auto px-6 text-center">
+          <p className="font-serif italic text-amber-300 text-xl mb-1">Reserve a table</p>
+          <h2 className="text-3xl md:text-4xl font-bold mb-3">Book Your Table or Send an Enquiry</h2>
+          <p className="text-white/60 mb-10">We'll confirm your booking by phone or email as soon as we see it.</p>
+          <BookingForm />
         </div>
       </section>
 

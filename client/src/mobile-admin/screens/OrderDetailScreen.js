@@ -20,8 +20,39 @@ const OrderDetailScreen = ({ order, onClose, onUpdated }) => {
   if (!order) return null;
   const status = (order.status || 'pending').toLowerCase();
   const items = Array.isArray(order.items) ? order.items : [];
-  const total = order.totalAmount || order.total || 0;
+  const total = order.totalAmount || order.total_amount || order.total || 0;
+  const tableId = order.tableId || order.table_id;
+  const orderType = order.orderType || order.order_type;
+  const customerName = order.customerName || order.customer_name;
+  const customerPhone = order.phone || order.customerPhone || order.customer_phone;
+  const deliveryAddress = order.delivery_address || order.address;
+  const lat = order.delivery_latitude || order.latitude;
+  const lng = order.delivery_longitude || order.longitude;
+  const mapsUrl = (lat && lng) ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+  const orderNumber = order.order_number || order.orderNumber || order.id;
+  const shareText = `📍 Delivery Location\nOrder: ${orderNumber}\n${customerName || ''}\n${customerPhone || ''}\n${deliveryAddress || ''}\n\n${mapsUrl || ''}`;
   const next = NEXT_STATUS[status];
+
+  const copyLink = () => {
+    if (!mapsUrl) return;
+    navigator.clipboard.writeText(mapsUrl).then(() => {
+      haptics.success();
+      alert('✅ Location link copied to clipboard!');
+    }).catch(() => alert('❌ Failed to copy link'));
+  };
+
+  const shareLocation = () => {
+    if (!mapsUrl) return;
+    if (navigator.share) {
+      navigator.share({ title: `Delivery - Order ${orderNumber}`, text: shareText }).catch((err) => {
+        if (err.name !== 'AbortError') console.log('Share failed:', err);
+      });
+    } else {
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('✅ Location details copied to clipboard!');
+      }).catch(() => alert('Failed to copy'));
+    }
+  };
 
   const advance = async () => {
     if (!next || busy) return;
@@ -59,19 +90,73 @@ const OrderDetailScreen = ({ order, onClose, onUpdated }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800 }}>
-              {order.tableId ? `Table ${order.tableId}` : order.orderType === 'delivery' ? 'Delivery' : 'Takeaway'}
+              {tableId ? `Table ${tableId}` : orderType === 'delivery' ? 'Delivery' : orderType === 'takeaway' ? 'Takeaway' : 'Dine-in'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--m-text-2)' }}>#{String(order.id || '').slice(-6)}</div>
           </div>
           <span className={`m-pill ${status}`}>{status}</span>
         </div>
 
-        {(order.customerName || order.phone) && (
+        {(customerName || customerPhone) && (
           <div style={{ marginTop: 10, fontSize: 13, color: 'var(--m-text-2)' }}>
-            {order.customerName || 'Guest'}{order.phone ? ` · ${order.phone}` : ''}
+            {customerName || 'Guest'}{customerPhone ? ` · ${customerPhone}` : ''}
+          </div>
+        )}
+
+        {deliveryAddress && (
+          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--m-text-2)' }}>
+            📍 {deliveryAddress}
           </div>
         )}
       </div>
+
+      {mapsUrl && (
+        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="m-btn-secondary"
+              style={{ flex: 1, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', background: 'var(--m-blue)', color: '#fff' }}
+            >
+              📍 View Location
+            </a>
+            <button
+              onClick={copyLink}
+              className="m-btn-secondary"
+              style={{ flex: 1, height: 42 }}
+            >
+              📋 Copy Link
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={shareLocation}
+              className="m-btn-secondary"
+              style={{ flex: 1, height: 42, background: 'var(--m-green)', color: '#fff' }}
+            >
+              🔗 Share
+            </button>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="m-btn-secondary"
+              style={{ flex: 1, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', background: '#25D366', color: '#fff' }}
+            >
+              💬 WhatsApp
+            </a>
+            <a
+              href={`sms:?body=${encodeURIComponent(shareText)}`}
+              className="m-btn-secondary"
+              style={{ flex: 1, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', background: 'var(--m-amber)', color: '#fff' }}
+            >
+              💬 SMS
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="m-section-label">Items</div>
       <div className="m-list">

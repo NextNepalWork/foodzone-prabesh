@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reports API Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .endpoint { background: white; margin: 10px 0; padding: 15px; border-radius: 8px; border-left: 4px solid #4f46e5; }
+        .endpoint.success { border-left-color: #10b981; }
+        .endpoint.error { border-left-color: #ef4444; }
+        .status { font-weight: bold; margin-bottom: 10px; }
+        .data { background: #f9fafb; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto; }
+        button { background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 5px; }
+        button:hover { background: #4338ca; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Reports API Tester</h1>
+    <p>Testing all report endpoints without authentication</p>
+    
+    <button onclick="testAll()">Test All Endpoints</button>
+    <button onclick="clearResults()">Clear Results</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        const endpoints = [
+            { name: 'Overview', url: '/api/reports/overview?range=30d' },
+            { name: 'Sales Trend', url: '/api/reports/sales-trend?range=30d&granularity=day' },
+            { name: 'Category Breakdown', url: '/api/reports/category-breakdown?range=30d' },
+            { name: 'Payment Mix', url: '/api/reports/payment-mix?range=30d' },
+            { name: 'Order Type Mix', url: '/api/reports/order-type-mix?range=30d' },
+            { name: 'Top Items', url: '/api/reports/top-items?range=30d&metric=revenue&limit=10' },
+            { name: 'Slow Movers', url: '/api/reports/slow-movers?range=30d&limit=10' },
+            { name: 'Customers', url: '/api/reports/customers?range=30d&limit=10' },
+            { name: 'Hourly Load', url: '/api/reports/hourly-load?range=30d' },
+            { name: 'Heatmap', url: '/api/reports/heatmap?range=30d' },
+            { name: 'Table Performance', url: '/api/reports/table-performance?range=30d' },
+            { name: 'Staff Activity', url: '/api/reports/staff-activity?range=30d' },
+            { name: 'Discounts', url: '/api/reports/discounts?range=30d' },
+            { name: 'Inventory Valuation', url: '/api/reports/inventory-valuation' },
+            { name: 'Profit & Loss', url: '/api/reports/profit-loss?range=30d' },
+            { name: 'P&L Trend', url: '/api/reports/profit-loss-trend?range=30d' },
+            { name: 'Expenses', url: '/api/reports/expenses?range=30d' },
+            { name: 'Expense Categories', url: '/api/reports/expense-categories?range=30d' },
+            { name: 'Data Check', url: '/api/reports/data-check' },
+        ];
+        
+        async function testEndpoint(endpoint) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'endpoint';
+            resultDiv.innerHTML = `<div class="status">Testing: ${endpoint.name}...</div>`;
+            document.getElementById('results').appendChild(resultDiv);
+            
+            try {
+                const response = await fetch(endpoint.url);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'endpoint success';
+                    resultDiv.innerHTML = `
+                        <div class="status">✅ ${endpoint.name} - ${response.status}</div>
+                        <div><strong>URL:</strong> ${endpoint.url}</div>
+                        <div class="data">${JSON.stringify(data, null, 2)}</div>
+                    `;
+                } else {
+                    resultDiv.className = 'endpoint error';
+                    resultDiv.innerHTML = `
+                        <div class="status">❌ ${endpoint.name} - ${response.status}</div>
+                        <div><strong>URL:</strong> ${endpoint.url}</div>
+                        <div class="data">${JSON.stringify(data, null, 2)}</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'endpoint error';
+                resultDiv.innerHTML = `
+                    <div class="status">❌ ${endpoint.name} - ERROR</div>
+                    <div><strong>URL:</strong> ${endpoint.url}</div>
+                    <div class="data">${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testAll() {
+            clearResults();
+            for (const endpoint of endpoints) {
+                await testEndpoint(endpoint);
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

@@ -318,12 +318,14 @@ const TableOrder = () => {
   const filteredMenuItems = useMemo(() => {
     return menuItems.filter(item => {
       if (!item || !item.name || !item.id || item.price === undefined) return false;
-      if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return item.name.toLowerCase().includes(q) ||
-        (item.category && item.category.toLowerCase().includes(q)) ||
-        (item.description && item.description.toLowerCase().includes(q));
+      if (!searchQuery) {
+        if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
+        return true;
+      }
+      // Search runs across all categories, independent of the selected category chip
+      const haystack = `${item.name} ${item.category || ''} ${item.description || ''}`.toLowerCase();
+      const words = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      return words.every(w => haystack.includes(w));
     });
   }, [menuItems, selectedCategory, searchQuery]);
 

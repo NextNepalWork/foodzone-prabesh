@@ -3,10 +3,21 @@ import { getApiUrl } from '../config/api';
 
 class PushNotificationManager {
   constructor() {
-    this.vapidPublicKey = 'BEl62iUYgUivxIkv69yViEuiBIa40HuWukzpOCmnLmPTwURgxmSWHVvSKHjh6CR70C8uYWduFkBFRdKfvQuo5GQ'; // Replace with your VAPID key
+    this.vapidPublicKey = null;
     this.registration = null;
     this.subscription = null;
     this.supported = 'serviceWorker' in navigator && 'PushManager' in window;
+  }
+
+  // Fetch the server's real VAPID public key
+  async fetchVapidPublicKey() {
+    const response = await fetch(`${getApiUrl()}/api/push/vapid-public-key`);
+    const data = await response.json();
+    if (!data.publicKey) {
+      throw new Error('Push notifications are not configured on the server');
+    }
+    this.vapidPublicKey = data.publicKey;
+    return this.vapidPublicKey;
   }
 
   // Check if push notifications are supported
@@ -45,8 +56,16 @@ class PushNotificationManager {
     if (!this.registration) {
       await this.registerServiceWorker();
     }
+    if (!this.vapidPublicKey) {
+      await this.fetchVapidPublicKey();
+    }
 
     try {
+      const existing = await this.registration.pushManager.getSubscription();
+      if (existing) {
+        this.subscription = existing;
+        return this.subscription;
+      }
       this.subscription = await this.registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: this.urlBase64ToUint8Array(this.vapidPublicKey)
@@ -60,8 +79,8 @@ class PushNotificationManager {
     }
   }
 
-  // Send subscription to server (optional - fallback to local notifications)
-  async sendSubscriptionToServer(subscription) {
+  // Send subscription to server so it can push notifications even when the app is closed
+  async sendSubscriptionToServer(subscription, role = 'staff') {
     try {
       const response = await fetch(`${getApiUrl()}/api/push/subscribe`, {
         method: 'POST',
@@ -70,12 +89,12 @@ class PushNotificationManager {
         },
         body: JSON.stringify({
           subscription: subscription,
-          userAgent: navigator.userAgent
+          role
         })
       });
 
       if (!response.ok) {
-        console.warn('Server push endpoint not available, using local notifications only');
+        console.warn('Failed to register push subscription with server, using local notifications only');
         return { success: true, local: true };
       }
 

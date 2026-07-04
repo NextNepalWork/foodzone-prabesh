@@ -34,11 +34,21 @@ const TablesScreen = () => {
 
   useEffect(() => { load(); }, []);
 
-  const tableById = new Map(tables.map((t) => [String(t.id || t.tableId), t]));
+  const normalizeStatus = (s) => {
+    const v = (s || 'empty').toLowerCase();
+    return v === 'available' ? 'empty' : v;
+  };
+
+  const tableById = new Map(tables.map((t) => [String(t.id || t.tableId || t.table_id), t]));
   const tiles = Array.from({ length: tableCount }, (_, i) => {
     const id = i + 1;
     const t = tableById.get(String(id)) || { id, status: 'empty', orderCount: 0 };
-    return t;
+    return {
+      ...t,
+      id: t.id || t.tableId || t.table_id || id,
+      status: normalizeStatus(t.status),
+      orderCount: t.orderCount ?? t.activeOrders ?? t.order_count ?? 0,
+    };
   });
 
   const onClearTable = async () => {
@@ -58,7 +68,7 @@ const TablesScreen = () => {
   };
 
   const stats = {
-    occupied: tables.filter((t) => (t.status || '').toLowerCase() !== 'empty').length,
+    occupied: tiles.filter((t) => t.status !== 'empty').length,
     total: tableCount,
   };
 

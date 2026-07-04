@@ -181,6 +181,7 @@ const MenuManagement = ({ refreshTrigger }) => {
         preparation_time: formData.preparation_time ? parseInt(formData.preparation_time) : null,
         is_vegetarian: formData.is_vegetarian || false,
         is_spicy: formData.is_spicy || false,
+        is_available: formData.is_available !== false,
         image_url: formData.image_url.trim() || null
       };
 
@@ -202,7 +203,8 @@ const MenuManagement = ({ refreshTrigger }) => {
           image_url: '',
           preparation_time: '',
           is_vegetarian: false,
-          is_spicy: false
+          is_spicy: false,
+          is_available: true
         });
         // Refresh menu items
         await fetchMenuItems();
@@ -225,7 +227,8 @@ const MenuManagement = ({ refreshTrigger }) => {
       image_url: item.image_url || '',
       preparation_time: item.preparation_time || '',
       is_vegetarian: item.is_vegetarian || false,
-      is_spicy: item.is_spicy || false
+      is_spicy: item.is_spicy || false,
+      is_available: item.is_available !== false
     });
     setShowEditModal(true);
   };

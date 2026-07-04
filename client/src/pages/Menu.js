@@ -249,14 +249,14 @@ const Menu = () => {
     return menuItems.filter(item => {
       if (!item || !item.name) return false;
       
-      const matchesSearch = debouncedSearchQuery === '' || 
-        item.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-        (item.category && item.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) ||
-        (item.description && item.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase()));
-      
-      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
+      const searchWords = debouncedSearchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      if (searchWords.length > 0) {
+        // Search runs across all categories, independent of the selected category chip
+        const haystack = `${item.name} ${item.category || ''} ${item.description || ''}`.toLowerCase();
+        return searchWords.every(w => haystack.includes(w));
+      }
+
+      return selectedCategory === 'All' || item.category === selectedCategory;
     });
   }, [menuItems, selectedCategory, debouncedSearchQuery]);
   
@@ -404,34 +404,40 @@ const Menu = () => {
       )}
       
       {/* Search Bar */}
-      <div className="max-w-md mx-auto mb-6">
+      <div className="max-w-md mx-auto mb-4">
         <div className="relative">
           <input
             type="text"
-            placeholder="Search menu items, categories..."
+            placeholder="Search menu (momo, pizza, tea...)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 pl-10 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+            className="w-full h-11 pl-10 pr-9 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
           />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-xs flex items-center justify-center"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
-      
+
       {/* Category Filter */}
-      <div className="mb-6">
-        <div className="flex flex-wrap justify-center gap-2">
+      <div className="mb-6 max-w-2xl mx-auto">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar px-1 pb-1">
           {categories.map(category => (
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`px-3 py-1 rounded text-sm transition-colors ${
+              className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition active:scale-95 ${
                 selectedCategory === category
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-orange-500 text-white border-orange-500 shadow'
+                  : 'bg-white text-slate-700 border-slate-300 hover:border-orange-300'
               }`}
             >
               {category}

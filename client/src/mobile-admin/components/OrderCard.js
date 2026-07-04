@@ -19,14 +19,16 @@ const OrderCard = ({ order, onClick, currencySymbol = 'Rs.' }) => {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemPreview = items.slice(0, 2).map((i) => `${i.quantity || 1}× ${i.name}`).join(', ');
   const extraCount = items.length - 2;
-  const total = order.totalAmount || order.total || 0;
+  const total = order.totalAmount || order.total_amount || order.total || 0;
+  const tableId = order.tableId || order.table_id;
+  const orderType = order.orderType || order.order_type;
 
   return (
     <div className="m-order-card" onClick={onClick}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontWeight: 800, fontSize: 15 }}>
-            {order.tableId ? `Table ${order.tableId}` : order.orderType === 'delivery' ? 'Delivery' : 'Takeaway'}
+            {tableId ? `Table ${tableId}` : orderType === 'delivery' ? 'Delivery' : orderType === 'takeaway' ? 'Takeaway' : 'Dine-in'}
           </span>
           <span style={{ fontSize: 12, color: 'var(--m-text-2)' }}>
             #{String(order.id || '').slice(-4)}
