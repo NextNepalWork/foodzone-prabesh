@@ -214,7 +214,7 @@ const Homepage = () => {
       {/* Hero */}
       <section
         className="relative -mt-32 pt-32 pb-16 text-white bg-cover bg-center"
-        style={{ backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 55%, rgba(10,10,10,0.94) 100%), url('/images/hero/hero-storefront.png')" }}
+        style={{ backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 55%, rgba(10,10,10,0.94) 100%), url('/images/hero/hero-storefront-real.jpg')" }}
       >
         <div className="container mx-auto px-6 relative z-10 pt-16 pb-8">
           <Eyebrow>Welcome to</Eyebrow>
