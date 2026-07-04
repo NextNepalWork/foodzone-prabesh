@@ -155,12 +155,31 @@ const PopularDishes = () => {
     fetchApi.get('/api/menu').then((data) => {
       if (!alive) return;
       const list = Array.isArray(data) ? data : data.items || [];
-      setItems(list.filter((i) => i && i.name && i.price !== undefined).slice(0, 8));
+      setItems(list.filter((i) => i && i.name && i.price !== undefined));
     }).catch(() => setItems([])).finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, []);
 
-  const shown = useMemo(() => items.slice(0, 4), [items]);
+  // Strip size/variant suffixes like "(Large)", "(Small)", "(Medium)" so we
+  // don't show the same dish 3 times just because it has size options.
+  const baseName = (name) => name.replace(/\s*\(.*?\)\s*$/, '').trim().toLowerCase();
+
+  const shown = useMemo(() => {
+    const seenNames = new Set();
+    const seenCategories = new Map();
+    const picked = [];
+    for (const item of items) {
+      const key = baseName(item.name);
+      if (seenNames.has(key)) continue;
+      const catCount = seenCategories.get(item.category) || 0;
+      if (catCount >= 2) continue; // avoid one category dominating the 4 slots
+      seenNames.add(key);
+      seenCategories.set(item.category, catCount + 1);
+      picked.push(item);
+      if (picked.length === 4) break;
+    }
+    return picked;
+  }, [items]);
 
   if (!loading && shown.length === 0) return null;
 
