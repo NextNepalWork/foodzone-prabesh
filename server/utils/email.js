@@ -12,6 +12,9 @@ if (smtpConfigured) {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Some hosts (Hostinger included) resolve to an IPv6 address that isn't
+    // routable from certain container networks (e.g. Railway) — force IPv4.
+    family: 4,
   });
 } else {
   console.warn('⚠️ SMTP not configured — email sending disabled (set SMTP_HOST/SMTP_USER/SMTP_PASS)');
