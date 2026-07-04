@@ -71,7 +71,7 @@ const TableGrid = () => {
       case 'occupied': return 'bg-gray-50 border-gray-300 text-gray-800';
       case 'ordering': return 'bg-blue-50 border-blue-200 text-blue-800';
       case 'dining': return 'bg-gray-100 border-gray-300 text-gray-800';
-      case 'payment_pending': return 'bg-orange-50 border-orange-200 text-orange-800';
+      case 'payment_pending': return 'bg-amber-50 border-amber-200 text-amber-800';
       case 'completed': return 'bg-gray-100 border-gray-300 text-gray-700';
       default: return 'bg-white border-gray-200 text-gray-700';
     }

@@ -373,7 +373,7 @@ const TableOrder = () => {
   if (loading) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500"></div>
         <p className="mt-4 text-slate-600 text-sm">Loading menu...</p>
       </div>
     );
@@ -386,7 +386,7 @@ const TableOrder = () => {
         {/* ─── Thin Top Header ───────────────────────────── */}
         <header className="shrink-0 h-12 px-3 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm pt-safe">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-white font-bold text-sm shadow">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-white font-bold text-sm shadow">
             {tableId}
           </div>
           <div className="leading-tight min-w-0">
@@ -420,7 +420,7 @@ const TableOrder = () => {
 
           <button
             onClick={() => setShowCart(true)}
-            className="relative flex items-center gap-1 px-2.5 h-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold active:scale-95 transition shadow"
+            className="relative flex items-center gap-1 px-2.5 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold active:scale-95 transition shadow"
           >
             <span>🛒</span>
             <span className="hidden xs:inline">Cart</span>
@@ -442,7 +442,7 @@ const TableOrder = () => {
               placeholder="Search menu (momo, pizza, tea...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full h-9 pl-9 pr-3 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             />
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -467,8 +467,8 @@ const TableOrder = () => {
                 onClick={() => setSelectedCategory(cat)}
                 className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition active:scale-95 ${
                   active
-                    ? 'bg-orange-500 text-white border-orange-500 shadow'
-                    : 'bg-white text-slate-700 border-slate-300 hover:border-orange-300'
+                    ? 'bg-amber-500 text-white border-amber-500 shadow'
+                    : 'bg-white text-slate-700 border-slate-300 hover:border-amber-300'
                 }`}
               >
                 {cat}
@@ -497,7 +497,7 @@ const TableOrder = () => {
             {(searchQuery || selectedCategory !== 'All') && (
               <button
                 onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}
-                className="mt-3 text-orange-600 underline text-sm"
+                className="mt-3 text-amber-600 underline text-sm"
               >
                 Clear filters
               </button>
@@ -515,13 +515,13 @@ const TableOrder = () => {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-slate-800 text-sm truncate">{item.name}</h4>
                     <div className="text-[11px] text-slate-500 truncate">{item.category}</div>
-                    <div className="text-sm font-bold text-orange-600 mt-0.5">NPR {item.price}/-</div>
+                    <div className="text-sm font-bold text-amber-600 mt-0.5">NPR {item.price}/-</div>
                   </div>
 
                   {quantity === 0 ? (
                     <button
                       onClick={() => addToCart(item, 1)}
-                      className="shrink-0 px-3 h-9 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold active:scale-95 transition shadow"
+                      className="shrink-0 px-3 h-9 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold active:scale-95 transition shadow"
                     >
                       + Add
                     </button>
@@ -536,7 +536,7 @@ const TableOrder = () => {
                       <span className="text-sm font-semibold w-6 text-center">{quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.id, quantity + 1)}
-                        className="w-7 h-7 rounded-full bg-orange-500 text-white font-bold text-sm shadow active:scale-95"
+                        className="w-7 h-7 rounded-full bg-amber-500 text-white font-bold text-sm shadow active:scale-95"
                       >
                         +
                       </button>
@@ -638,7 +638,7 @@ const TableOrder = () => {
                       </div>
 
                       {!item.isCustom && (
-                        <div className="text-sm font-bold text-orange-600">
+                        <div className="text-sm font-bold text-amber-600">
                           NPR {item.price * item.quantity}/-
                         </div>
                       )}
@@ -653,7 +653,7 @@ const TableOrder = () => {
                         <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded-full bg-orange-500 text-white text-sm shadow"
+                          className="w-6 h-6 rounded-full bg-amber-500 text-white text-sm shadow"
                         >
                           +
                         </button>
@@ -677,13 +677,13 @@ const TableOrder = () => {
               <div className="shrink-0 border-t border-slate-200 px-4 py-3 pb-safe bg-slate-50">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-slate-700">Total</span>
-                  <span className="text-lg font-bold text-orange-600">NPR {getTotalPrice()}/-</span>
+                  <span className="text-lg font-bold text-amber-600">NPR {getTotalPrice()}/-</span>
                 </div>
 
                 {!showCheckout ? (
                   <button
                     onClick={() => setShowCheckout(true)}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold text-sm shadow-lg active:scale-95 transition"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm shadow-lg active:scale-95 transition"
                   >
                     Proceed to Order
                   </button>
@@ -694,14 +694,14 @@ const TableOrder = () => {
                       placeholder="Your Name (Optional)"
                       value={customerInfo.name}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                      className="w-full h-10 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full h-10 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     <input
                       type="tel"
                       placeholder="Phone Number (Optional)"
                       value={customerInfo.phone}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                      className="w-full h-10 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full h-10 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     {errorMessage && (
                       <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">

@@ -395,7 +395,7 @@ const Menu = () => {
                   window.location.href = '/';
                 }
               }}
-              className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+              className="bg-amber-500 text-white px-6 py-2 rounded-lg hover:bg-amber-600 transition-colors font-medium"
             >
               Go Back to Table {currentTable}
             </button>
@@ -411,7 +411,7 @@ const Menu = () => {
             placeholder="Search menu (momo, pizza, tea...)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-11 pl-10 pr-9 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="w-full h-11 pl-10 pr-9 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           />
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -436,8 +436,8 @@ const Menu = () => {
               onClick={() => setSelectedCategory(category)}
               className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition active:scale-95 ${
                 selectedCategory === category
-                  ? 'bg-orange-500 text-white border-orange-500 shadow'
-                  : 'bg-white text-slate-700 border-slate-300 hover:border-orange-300'
+                  ? 'bg-amber-500 text-white border-amber-500 shadow'
+                  : 'bg-white text-slate-700 border-slate-300 hover:border-amber-300'
               }`}
             >
               {category}
@@ -453,7 +453,7 @@ const Menu = () => {
             Found {filteredItems.length} items for "{debouncedSearchQuery}"
             <button
               onClick={() => setSearchQuery('')}
-              className="ml-2 underline text-sm text-orange-600 hover:text-orange-700"
+              className="ml-2 underline text-sm text-amber-600 hover:text-amber-700"
             >
               Clear search
             </button>
@@ -475,7 +475,7 @@ const Menu = () => {
           {debouncedSearchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
+              className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors"
             >
               Clear search
             </button>
@@ -555,7 +555,7 @@ const Menu = () => {
               <button
                 onClick={loadMoreItems}
                 disabled={isLoadingMore}
-                className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-amber-500 text-white px-6 py-2 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoadingMore ? (
                   <div className="flex items-center gap-2">
@@ -578,7 +578,7 @@ const Menu = () => {
           <p className="text-sm mb-3 text-gray-600">Ready to place your delivery order?</p>
           <Link 
             to="/delivery-cart"
-            className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
+            className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors"
           >
             Go to Delivery Cart
           </Link>

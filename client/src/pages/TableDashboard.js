@@ -127,7 +127,7 @@ const TableDashboard = () => {
 
   const getPaymentStatusColor = (status) => {
     const colors = {
-      'pending': 'bg-orange-100 text-orange-800 border-orange-300',
+      'pending': 'bg-amber-100 text-amber-800 border-amber-300',
       'paid': 'bg-green-100 text-green-800 border-green-300',
       'failed': 'bg-red-100 text-red-800 border-red-300',
       'refunded': 'bg-gray-100 text-gray-800 border-gray-300'
@@ -169,7 +169,7 @@ const TableDashboard = () => {
   if (loading) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500"></div>
         <p className="mt-4 text-slate-600 text-sm">Loading orders...</p>
       </div>
     );
@@ -202,7 +202,7 @@ const TableDashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 text-white font-bold text-lg shadow">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white font-bold text-lg shadow">
               {tableId}
             </div>
             <div>
@@ -219,9 +219,9 @@ const TableDashboard = () => {
               <div className="text-xs text-blue-600 font-semibold mb-1">Total Orders</div>
               <div className="text-2xl font-bold text-blue-800">{orders.length}</div>
             </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-3 border border-orange-200">
-              <div className="text-xs text-orange-600 font-semibold mb-1">Pending Payment</div>
-              <div className="text-2xl font-bold text-orange-800">NPR {getPendingAmount()}</div>
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-3 border border-amber-200">
+              <div className="text-xs text-amber-600 font-semibold mb-1">Pending Payment</div>
+              <div className="text-2xl font-bold text-amber-800">NPR {getPendingAmount()}</div>
             </div>
           </div>
         )}
@@ -237,25 +237,25 @@ const TableDashboard = () => {
 
         {/* Pay Total Button - Shows when multiple pending orders exist */}
         {orders.filter(order => order.payment_status === 'pending').length > 1 && (
-          <div className="mb-4 bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-4 shadow-md">
+          <div className="mb-4 bg-gradient-to-r from-amber-50 to-amber-100 border-2 border-amber-300 rounded-xl p-4 shadow-md">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="text-sm font-semibold text-orange-800 mb-1">
+                <div className="text-sm font-semibold text-amber-800 mb-1">
                   💰 Pay All Pending Orders
                 </div>
-                <div className="text-xs text-orange-600">
+                <div className="text-xs text-amber-600">
                   {orders.filter(order => order.payment_status === 'pending').length} orders pending payment
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-orange-800">
+                <div className="text-2xl font-bold text-amber-800">
                   NPR {getPendingAmount().toFixed(2)}
                 </div>
               </div>
             </div>
             <button
               onClick={handlePayTotal}
-              className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg font-bold text-base shadow-lg active:scale-[0.98] transition flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg font-bold text-base shadow-lg active:scale-[0.98] transition flex items-center justify-center gap-2"
             >
               <span className="text-xl">📱</span>
               <span>Pay Total with QR Code</span>
@@ -270,7 +270,7 @@ const TableDashboard = () => {
             <p className="text-slate-600 mb-4">Start by ordering from the menu</p>
             <button
               onClick={() => navigate(`/${tableId}`)}
-              className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold shadow"
+              className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-semibold shadow"
             >
               Browse Menu
             </button>
@@ -302,7 +302,7 @@ const TableDashboard = () => {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${getPaymentStatusColor(order.payment_status)}`}>
                       💳 {order.payment_status === 'paid' ? 'Paid' : 'Payment Pending'}
                     </span>
-                    <span className="text-lg font-bold text-orange-600">
+                    <span className="text-lg font-bold text-amber-600">
                       NPR {parseFloat(order.total || 0).toFixed(2)}
                     </span>
                   </div>

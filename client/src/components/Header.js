@@ -65,7 +65,7 @@ const Header = React.memo(() => {
                   e.target.nextElementSibling.style.display = 'flex';
                 }}
               />
-              <div className={`h-16 w-16 rounded-full bg-gradient-to-br from-orange-500 to-red-600 shadow-lg border-2 ${isTablePage ? 'border-amber-200' : 'border-white'} hidden items-center justify-center`}>
+              <div className={`h-16 w-16 rounded-full bg-gradient-to-br from-amber-500 to-red-600 shadow-lg border-2 ${isTablePage ? 'border-amber-200' : 'border-white'} hidden items-center justify-center`}>
                 <span className="text-white font-bold text-lg">{restaurantInfo.name.substring(0, 2).toUpperCase()}</span>
               </div>
             </div>

@@ -49,7 +49,7 @@ const FloatingCart = () => {
     cartLink = `/${currentTable}`;
     
     cartType = `Table ${currentTable}`;
-    cartColor = 'bg-primary hover:bg-orange-600';
+    cartColor = 'bg-primary hover:bg-amber-600';
   } else if (!currentTable && deliveryCartCount > 0) {
     // Show delivery cart
     cartItemCount = deliveryCartCount;

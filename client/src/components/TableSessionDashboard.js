@@ -92,7 +92,7 @@ const TableSessionDashboard = () => {
       case 'occupied': return 'bg-yellow-100 text-yellow-800';
       case 'ordering': return 'bg-blue-100 text-blue-800';
       case 'dining': return 'bg-purple-100 text-purple-800';
-      case 'payment_pending': return 'bg-orange-100 text-orange-800';
+      case 'payment_pending': return 'bg-amber-100 text-amber-800';
       case 'completed': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -177,7 +177,7 @@ const TableSessionDashboard = () => {
             <div className="text-sm text-gray-600">Total Paid</div>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="text-2xl font-bold text-orange-600">${getRemainingBalance().toFixed(2)}</div>
+            <div className="text-2xl font-bold text-amber-600">${getRemainingBalance().toFixed(2)}</div>
             <div className="text-sm text-gray-600">Remaining Balance</div>
           </div>
         </div>

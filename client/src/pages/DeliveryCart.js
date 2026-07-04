@@ -270,7 +270,7 @@ const DeliveryCart = () => {
       )}
 
       {/* Prominent Menu Banner */}
-      <div className="bg-gradient-to-r from-yellow-300 via-orange-400 to-red-500 rounded-2xl p-8 mb-8 text-center shadow-2xl transform hover:scale-105 transition-all duration-300 animate-pulse hover:animate-none">
+      <div className="bg-gradient-to-r from-yellow-300 via-amber-400 to-red-500 rounded-2xl p-8 mb-8 text-center shadow-2xl transform hover:scale-105 transition-all duration-300 animate-pulse hover:animate-none">
         <div className="flex items-center justify-center space-x-6">
           <span className="text-6xl animate-bounce">🍽️</span>
           <div>
@@ -278,7 +278,7 @@ const DeliveryCart = () => {
             <p className="text-lg text-white mb-4 opacity-90">Discover more delicious items to add to your order!</p>
             <Link 
               to="/menu"
-              className="bg-white text-orange-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all duration-300 font-extrabold text-xl shadow-lg hover:shadow-xl transform hover:scale-110 inline-flex items-center space-x-3"
+              className="bg-white text-amber-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all duration-300 font-extrabold text-xl shadow-lg hover:shadow-xl transform hover:scale-110 inline-flex items-center space-x-3"
             >
               <span className="text-2xl">📋</span>
               <span>Browse Full Menu</span>

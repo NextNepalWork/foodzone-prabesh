@@ -18,7 +18,7 @@ const MenuItemCard = memo(({
     <div className="bg-white rounded-2xl border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all overflow-hidden relative flex flex-col">
       {/* Happy Hour Badge */}
       {hasDiscount && (
-        <div className="absolute top-2 right-2 z-10 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+        <div className="absolute top-2 right-2 z-10 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
           10% OFF
         </div>
       )}
@@ -34,10 +34,10 @@ const MenuItemCard = memo(({
             {hasDiscount ? (
               <>
                 <div className="text-xs text-slate-400 line-through">NPR {originalPrice}</div>
-                <div className="text-base font-bold text-orange-600">NPR {discountedPrice}</div>
+                <div className="text-base font-bold text-amber-600">NPR {discountedPrice}</div>
               </>
             ) : (
-              <div className="text-base font-bold text-orange-600">NPR {originalPrice}</div>
+              <div className="text-base font-bold text-amber-600">NPR {originalPrice}</div>
             )}
           </div>
         </div>
@@ -47,7 +47,7 @@ const MenuItemCard = memo(({
           {quantity === 0 ? (
             <button
               onClick={() => onAddToCart(item)}
-              className="w-full px-4 py-2.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600 active:scale-95 transition-all font-semibold"
+              className="w-full px-4 py-2.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all font-semibold"
             >
               {isTableCustomer ? `Add to Table ${currentTable}` : 'Add to Cart'}
             </button>
@@ -63,7 +63,7 @@ const MenuItemCard = memo(({
                 <span className="font-semibold text-lg w-6 text-center text-slate-800">{quantity}</span>
                 <button
                   onClick={() => onUpdateQuantity(item.id, quantity + 1)}
-                  className="w-9 h-9 rounded-lg bg-orange-500 text-white hover:bg-orange-600 active:scale-95 transition-all font-bold text-lg"
+                  className="w-9 h-9 rounded-lg bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all font-bold text-lg"
                 >
                   +
                 </button>

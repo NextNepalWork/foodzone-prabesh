@@ -9,8 +9,8 @@ const HappyHourSection = memo(({
   currentTable 
 }) => {
   return (
-    <div className="bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 rounded-2xl p-6 mb-8 shadow-xl border-4 border-yellow-300 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 via-orange-400/20 to-red-400/20 animate-pulse"></div>
+    <div className="bg-gradient-to-r from-yellow-400 via-amber-400 to-red-400 rounded-2xl p-6 mb-8 shadow-xl border-4 border-yellow-300 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-red-400/20 animate-pulse"></div>
       <div className="relative z-10 text-center">
         <div className="flex items-center justify-center mb-4">
           <span className="text-5xl mr-3 animate-bounce">🎉</span>
@@ -30,7 +30,7 @@ const HappyHourSection = memo(({
                     <p className="text-sm text-gray-600">{item.description}</p>
                   </div>
                   <div className="ml-3 flex-shrink-0">
-                    <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1 rounded-full shadow-md">
+                    <div className="bg-gradient-to-r from-red-500 to-amber-500 text-white px-3 py-1 rounded-full shadow-md">
                       <span className="text-sm font-bold">NPR {item.price}</span>
                     </div>
                   </div>
@@ -44,7 +44,7 @@ const HappyHourSection = memo(({
                     }}
                     className={`w-full px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg ${
                       isTableCustomer 
-                        ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600' 
+                        ? 'bg-gradient-to-r from-amber-500 to-red-500 text-white hover:from-amber-600 hover:to-red-600' 
                         : 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600'
                     }`}
                   >
@@ -64,7 +64,7 @@ const HappyHourSection = memo(({
                         onClick={() => handleUpdateQuantity(item.id, quantity + 1)}
                         className={`w-8 h-8 rounded-full text-white transition-all duration-200 shadow-md font-bold text-sm ${
                           isTableCustomer 
-                            ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' 
+                            ? 'bg-gradient-to-r from-amber-500 to-red-500 hover:from-amber-600 hover:to-red-600' 
                             : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600'
                         }`}
                       >

@@ -51,8 +51,8 @@ const getDeliveryInfo = (distance) => {
       zone: 'Extended Area',
       time: '30-45 mins',
       fee: 'NPR 80',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100'
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-100'
     };
   } else {
     return {
