@@ -218,14 +218,14 @@ const PopularDishes = () => {
                 <div className="p-4">
                   <h3 className="font-semibold text-neutral-900 truncate">{item.name}</h3>
                   <p className="text-sm text-neutral-500">{item.category}</p>
-                  <p className="mt-1 font-bold text-primary">NPR {Number(item.price).toFixed(0)}</p>
+                  <p className="mt-1 font-bold text-amber-600">NPR {Number(item.price).toFixed(0)}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
         <div className="text-center mt-10">
-          <Link to="/menu" className="inline-flex items-center gap-1.5 text-primary font-semibold hover:gap-2.5 transition-all">
+          <Link to="/menu" className="inline-flex items-center gap-1.5 text-amber-600 font-semibold hover:gap-2.5 transition-all">
             View full menu <Icon name="chevron" className="w-4 h-4" />
           </Link>
         </div>
@@ -425,7 +425,7 @@ const Homepage = () => {
             ))}
           </div>
           <div className="text-center mt-10">
-            <a href={`tel:${restaurantInfo.phone}`} className="inline-flex items-center gap-2 bg-primary hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+            <a href={`tel:${restaurantInfo.phone}`} className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-6 py-3 rounded-lg transition-colors">
               <Icon name="phone" className="w-5 h-5" /> Call to Reserve
             </a>
           </div>
@@ -476,21 +476,21 @@ const Homepage = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-16 bg-primary text-white">
+      <section className="py-16 bg-amber-500 text-neutral-900">
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Order?</h2>
-          <p className="text-lg mb-8 text-white/90">
+          <p className="text-lg mb-8 text-neutral-900/80">
             Look for the QR code on your table, or browse our menu online. Dine-in, takeaway and delivery, all in one place.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link to="/menu" className="bg-white text-primary px-8 py-3 rounded-lg font-semibold hover:bg-neutral-100 transition-colors inline-flex items-center gap-2">
+            <Link to="/menu" className="bg-neutral-900 text-white px-8 py-3 rounded-lg font-semibold hover:bg-neutral-800 transition-colors inline-flex items-center gap-2">
               <Icon name="plate" className="w-5 h-5" /> Browse Menu
             </Link>
-            <Link to="/delivery-cart" className="border border-white/60 hover:border-white px-8 py-3 rounded-lg font-semibold transition-colors inline-flex items-center gap-2">
+            <Link to="/delivery-cart" className="border border-neutral-900/40 hover:border-neutral-900 text-neutral-900 px-8 py-3 rounded-lg font-semibold transition-colors inline-flex items-center gap-2">
               <Icon name="truck" className="w-5 h-5" /> Order Delivery
             </Link>
           </div>
-          <div className="mt-8 text-sm text-white/80 flex flex-wrap justify-center gap-x-8 gap-y-2">
+          <div className="mt-8 text-sm text-neutral-900/75 flex flex-wrap justify-center gap-x-8 gap-y-2">
             <span className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4" /> {restaurantInfo.phone}</span>
             <span className="flex items-center gap-2"><Icon name="pin" className="w-4 h-4" /> foodzone.com.np</span>
           </div>
