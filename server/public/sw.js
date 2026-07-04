@@ -1,7 +1,7 @@
 // Food Zone PWA Service Worker - Enhanced for Instant Table Loading
-const CACHE_NAME = 'food-zone-v2.9.0';
-const API_CACHE = 'food-zone-api-v2.9';
-const TABLE_CACHE = 'food-zone-table-v2.9';
+const CACHE_NAME = 'food-zone-v2.10.0';
+const API_CACHE = 'food-zone-api-v2.10';
+const TABLE_CACHE = 'food-zone-table-v2.10';
 
 // Global variables
 let keepAliveInterval = null;
@@ -235,7 +235,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Navigation requests (HTML documents) use network-first so the app shell
+  // is always the latest version — this prevents stale UI (e.g. the customer
+  // header leaking onto /admin) from being served from an old cache. Falls
+  // back to the cached shell only when offline.
+  if (event.request.mode === 'navigate' ||
+      (event.request.headers.get('accept') || '').includes('text/html')) {
+    event.respondWith(
+      fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.ok && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return networkResponse;
+      }).catch(() =>
+        caches.match(event.request).then(r => r || caches.match('/'))
+      )
+    );
+    return;
+  }
+
   // Handle static resources with cache-first for instant loading
+  // (hashed JS/CSS are immutable, so cache-first is safe and fast here)
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) {
@@ -243,8 +264,8 @@ self.addEventListener('fetch', (event) => {
       }
       return fetch(event.request).then(networkResponse => {
         // Only cache successful responses with status 200 (not partial 206)
-        if (networkResponse && 
-            networkResponse.ok && 
+        if (networkResponse &&
+            networkResponse.ok &&
             networkResponse.status === 200 &&
             networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
