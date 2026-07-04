@@ -76,6 +76,36 @@ if (pushEnabled) {
   console.warn('⚠️ VAPID keys not set — push notifications disabled (socket.io realtime still works)');
 }
 
+// Email the admin about a new order, respecting per-order-type toggles in Settings
+async function sendOrderEmailNotification(order) {
+  try {
+    const isDelivery = order.order_type === 'delivery';
+    const isDineIn = !!order.table_id && !isDelivery;
+    const toggleKey = isDineIn ? 'notify.email_on_dinein' : isDelivery ? 'notify.email_on_delivery' : 'notify.email_on_takeaway';
+    const enabled = await settingsLoader.get(toggleKey, false);
+    if (!enabled) return;
+
+    const notifyEmail = await settingsLoader.get('notify.email_address', process.env.BOOKING_NOTIFY_EMAIL || '');
+    if (!smtpConfigured || !notifyEmail) return;
+
+    const orderLabel = isDineIn ? `Table ${order.table_id}` : isDelivery ? 'Delivery' : 'Takeaway';
+    await sendEmail({
+      to: notifyEmail,
+      subject: `🍽️ New ${orderLabel} Order - ${order.order_number || order.id}`,
+      html: `
+        <h2>New Order Received</h2>
+        <p><strong>Type:</strong> ${orderLabel}</p>
+        <p><strong>Order #:</strong> ${order.order_number || order.id}</p>
+        <p><strong>Customer:</strong> ${order.customer_name || 'Guest'} ${order.customer_phone ? `(${order.customer_phone})` : ''}</p>
+        <p><strong>Total:</strong> NPR ${order.total_amount || order.total || 0}</p>
+        ${order.delivery_address ? `<p><strong>Address:</strong> ${order.delivery_address}</p>` : ''}
+      `,
+    });
+  } catch (err) {
+    console.error('❌ Failed to send order notification email:', err.message);
+  }
+}
+
 // Send a push notification to every stored subscription (kitchen/staff devices)
 async function sendPushToAll(payload) {
   if (!pushEnabled) return;
@@ -1153,6 +1183,7 @@ app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (re
       tableId: order.table_id,
       totalAmount: order.total_amount || order.total || 0
     });
+    sendOrderEmailNotification(order);
 
     console.log('✅ New order created:', order.order_number);
     res.json({ success: true, order });
@@ -3772,8 +3803,25 @@ app.post('/api/payments', rateLimits.payments, validationRules.createPayment, as
     }
     
     console.log(`✅ Payment created for order ${order_id}: ${payment_method} - NPR ${amount}`);
-    
-    res.json({ 
+
+    // Email the admin about the payment, if enabled in Settings
+    settingsLoader.get('notify.email_on_payment', false).then(async (enabled) => {
+      if (!enabled) return;
+      const notifyEmail = await settingsLoader.get('notify.email_address', process.env.BOOKING_NOTIFY_EMAIL || '');
+      if (!smtpConfigured || !notifyEmail) return;
+      sendEmail({
+        to: notifyEmail,
+        subject: `💰 Payment Received - Order #${order.order_number}`,
+        html: `
+          <h2>Payment Received</h2>
+          <p><strong>Order #:</strong> ${order.order_number}</p>
+          <p><strong>Method:</strong> ${payment_method}</p>
+          <p><strong>Amount:</strong> NPR ${amount}</p>
+        `,
+      }).catch((err) => console.error('❌ Failed to send payment notification email:', err.message));
+    }).catch(() => {});
+
+    res.json({
       success: true,
       payment: payment,
       message: 'Payment recorded successfully'
@@ -4783,9 +4831,11 @@ app.post('/api/contact', async (req, res) => {
     );
     const entry = result.rows[0];
 
-    const notifyEmail = process.env.BOOKING_NOTIFY_EMAIL;
-    if (smtpConfigured && notifyEmail) {
-      const isBooking = entry.type === 'booking';
+    const isBooking = entry.type === 'booking';
+    const notifyEmail = await settingsLoader.get('notify.email_address', process.env.BOOKING_NOTIFY_EMAIL || '');
+    const toggleKey = isBooking ? 'notify.email_on_booking' : 'notify.email_on_enquiry';
+    const emailEnabled = await settingsLoader.get(toggleKey, true);
+    if (smtpConfigured && notifyEmail && emailEnabled) {
       const subject = isBooking
         ? `🍽️ New Table Booking Request from ${entry.name}`
         : `📩 New Enquiry from ${entry.name}`;
