@@ -164,11 +164,24 @@ const PopularDishes = () => {
   // don't show the same dish 3 times just because it has size options.
   const baseName = (name) => name.replace(/\s*\(.*?\)\s*$/, '').trim().toLowerCase();
 
+  // Drinks/beverages don't make an appealing "Popular Dishes" showcase.
+  const DRINK_CATEGORIES = ['black tea', 'tea', 'coffee', 'drinks', 'beverages', 'cold drinks', 'juice', 'lassi'];
+  const isDrink = (item) => DRINK_CATEGORIES.includes((item.category || '').trim().toLowerCase());
+
   const shown = useMemo(() => {
+    // Prefer spicy / higher-priced signature dishes first, drinks last
+    const ranked = [...items].sort((a, b) => {
+      const aDrink = isDrink(a), bDrink = isDrink(b);
+      if (aDrink !== bDrink) return aDrink ? 1 : -1;
+      const aSpicy = a.is_spicy ? 1 : 0, bSpicy = b.is_spicy ? 1 : 0;
+      if (aSpicy !== bSpicy) return bSpicy - aSpicy;
+      return Number(b.price || 0) - Number(a.price || 0);
+    });
+
     const seenNames = new Set();
     const seenCategories = new Map();
     const picked = [];
-    for (const item of items) {
+    for (const item of ranked) {
       const key = baseName(item.name);
       if (seenNames.has(key)) continue;
       const catCount = seenCategories.get(item.category) || 0;
