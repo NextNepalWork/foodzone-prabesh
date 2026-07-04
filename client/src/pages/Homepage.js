@@ -227,7 +227,7 @@ const Homepage = () => {
       <section
         className="relative -mt-32 pt-32 pb-16 text-white bg-cover"
         style={{
-          backgroundPosition: '75% center',
+          backgroundPosition: '100% center',
           backgroundImage:
             "linear-gradient(90deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 30%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.15) 100%)," +
             "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 55%, rgba(8,8,8,0.95) 100%)," +
