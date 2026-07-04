@@ -256,67 +256,69 @@ const Homepage = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section className="relative -mt-32 pt-32 pb-16 text-white bg-neutral-950 overflow-hidden">
+      <section className="relative -mt-32 pt-32 pb-12 md:pb-16 text-white bg-neutral-950 overflow-hidden">
         {/* Photo panel — pinned to the right, black text zone on the left */}
         <div className="absolute inset-0" aria-hidden="true">
           <img
             src="/images/hero/hero-storefront-real.jpg"
             alt="Food Zone Restaurant storefront at dusk in Duwakot, Bhaktapur"
-            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-center"
+            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-[72%_center] md:object-center"
           />
-          {/* Fade the photo's left edge into the black text zone */}
+          {/* Fade the photo's left edge into the black text zone (desktop) */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 hidden md:block"
             style={{
               background:
                 'linear-gradient(90deg, rgb(10,10,10) 0%, rgb(10,10,10) 34%, rgba(10,10,10,0.85) 46%, rgba(10,10,10,0.25) 70%, rgba(10,10,10,0.35) 100%)',
             }}
           />
+          {/* Mobile: uniform darkening so text stays legible over the full-width photo */}
+          <div className="absolute inset-0 md:hidden bg-black/60" />
           {/* Gentle top + bottom vignette so headers/footers stay legible */}
           <div
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 35%, rgba(10,10,10,0.75) 100%)' }}
+            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 35%, rgba(10,10,10,0.8) 100%)' }}
           />
         </div>
 
-        <div className="container mx-auto px-6 relative z-10 pt-16 pb-8">
+        <div className="container mx-auto px-5 sm:px-6 relative z-10 pt-24 md:pt-16 pb-8">
           <Eyebrow>Welcome to</Eyebrow>
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-none mb-2">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-none mb-2">
             {restaurantInfo.name}
           </h1>
-          <p className="font-serif italic text-2xl md:text-3xl text-amber-200 mb-6">
+          <p className="font-serif italic text-xl sm:text-2xl md:text-3xl text-amber-200 mb-4 md:mb-6">
             {restaurantInfo.tagline || 'Quality food, served fresh'}
           </p>
-          <p className="text-lg md:text-xl text-white/90 max-w-xl mb-8">
+          <p className="text-base md:text-xl text-white/90 max-w-xl mb-6 md:mb-8">
             Good food. Great taste. Unforgettable moments.
           </p>
 
-          <div className="flex flex-wrap gap-4 mb-12">
-            <Link to="/menu" className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-6 py-3 rounded-lg transition-colors">
+          <div className="flex flex-wrap gap-3 md:gap-4 mb-8 md:mb-12">
+            <Link to="/menu" className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-5 py-2.5 md:px-6 md:py-3 rounded-lg transition-colors">
               <Icon name="plate" className="w-5 h-5" /> View Menu
             </Link>
             <a
               href="https://maps.app.goo.gl/Nq2Y3A7eh9q73FnS6"
               target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 border border-white/50 hover:border-white text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 border border-white/50 hover:border-white text-white font-semibold px-5 py-2.5 md:px-6 md:py-3 rounded-lg transition-colors"
             >
               <Icon name="pin" className="w-5 h-5" /> Find Us
             </a>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-2xl mb-12 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5 md:gap-6 max-w-2xl mb-8 md:mb-12 text-xs sm:text-sm">
             {[['plate', 'Delicious Food'], ['heart', 'Made with Love'], ['leaf', 'Fresh Ingredients'], ['users', 'Warm Atmosphere']].map(([icon, label]) => (
-              <div key={label} className="flex flex-col items-center text-center gap-2">
-                <Icon name={icon} className="w-7 h-7 text-amber-300" />
+              <div key={label} className="flex flex-col items-center text-center gap-1.5 md:gap-2">
+                <Icon name={icon} className="w-6 h-6 md:w-7 md:h-7 text-amber-300" />
                 <span className="text-white/80">{label}</span>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/80 border-t border-white/15 pt-6">
-            <span className="flex items-center gap-2"><Icon name="pin" className="w-4 h-4" /> {restaurantInfo.address}</span>
-            <span className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4" /> {restaurantInfo.phone}</span>
-            <span className="flex items-center gap-2"><Icon name="clock" className="w-4 h-4" /> Daily: 7:30 AM - 10:30 PM</span>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-8 gap-y-2 md:gap-y-3 text-xs sm:text-sm text-white/80 border-t border-white/15 pt-5 md:pt-6">
+            <span className="flex items-center gap-2"><Icon name="pin" className="w-4 h-4 shrink-0" /> {restaurantInfo.address}</span>
+            <span className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 shrink-0" /> {restaurantInfo.phone}</span>
+            <span className="flex items-center gap-2"><Icon name="clock" className="w-4 h-4 shrink-0" /> Daily: 7:30 AM - 10:30 PM</span>
           </div>
         </div>
       </section>
