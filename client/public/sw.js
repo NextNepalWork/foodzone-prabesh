@@ -1,7 +1,7 @@
 // Food Zone PWA Service Worker - Enhanced for Instant Table Loading
-const CACHE_NAME = 'food-zone-v2.10.0';
-const API_CACHE = 'food-zone-api-v2.10';
-const TABLE_CACHE = 'food-zone-table-v2.10';
+const CACHE_NAME = 'food-zone-v2.11.0';
+const API_CACHE = 'food-zone-api-v2.11';
+const TABLE_CACHE = 'food-zone-table-v2.11';
 
 // Global variables
 let keepAliveInterval = null;
@@ -421,7 +421,14 @@ self.addEventListener('notificationclick', (event) => {
 // Handle messages from main thread
 self.addEventListener('message', (event) => {
   console.log('🔔 Service worker received message:', event.data);
-  
+
+  // Activate a freshly-installed worker immediately so the page can reload
+  // onto the latest version without a manual hard-refresh.
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+
   if (event.data && event.data.type === 'NEW_ORDER') {
     const { orderType, tableId, totalAmount, orderInfo } = event.data;
     const displayInfo = orderInfo || (orderType === 'dine-in' ? `Table ${tableId}` : 'Delivery');

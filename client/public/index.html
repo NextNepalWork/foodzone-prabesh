@@ -95,13 +95,37 @@
     <meta name="apple-mobile-web-app-title" content="Food Zone Restaurant" />
     <title>Food Zone Restaurant - Food Delivery in Duwakot, Bhaktapur | Order Online</title>
     
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration (with auto-update) -->
     <script>
       if ('serviceWorker' in navigator) {
+        // When a new service worker takes control, reload once so the user
+        // immediately gets the latest app instead of a stale cached version.
+        let hasReloadedForUpdate = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (hasReloadedForUpdate) return;
+          hasReloadedForUpdate = true;
+          window.location.reload();
+        });
+
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
               console.log('SW registered: ', registration);
+              // Proactively check for a newer service worker on each load.
+              registration.update();
+              // If an updated worker is waiting, activate it right away.
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              });
             })
             .catch((registrationError) => {
               console.log('SW registration failed: ', registrationError);
