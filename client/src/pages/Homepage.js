@@ -262,7 +262,7 @@ const Homepage = () => {
           <img
             src="/images/hero/hero-storefront-real.jpg"
             alt="Food Zone Restaurant storefront at dusk in Duwakot, Bhaktapur"
-            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-[18%_center] md:object-center"
+            className="absolute inset-y-0 right-0 h-full w-full md:w-[68%] lg:w-[62%] object-cover object-left md:object-center"
           />
           {/* Desktop: fade the photo's left edge into the black text zone */}
           <div
