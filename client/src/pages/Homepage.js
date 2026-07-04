@@ -252,7 +252,7 @@ const Homepage = () => {
               <Icon name="plate" className="w-5 h-5" /> View Menu
             </Link>
             <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(restaurantInfo.address || restaurantInfo.name)}`}
+              href="https://maps.app.goo.gl/Nq2Y3A7eh9q73FnS6"
               target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 border border-white/50 hover:border-white text-white font-semibold px-6 py-3 rounded-lg transition-colors"
             >
