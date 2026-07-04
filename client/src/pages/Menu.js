@@ -395,7 +395,7 @@ const Menu = () => {
                   window.location.href = '/';
                 }
               }}
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors font-medium"
+              className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium"
             >
               Go Back to Table {currentTable}
             </button>
@@ -453,7 +453,7 @@ const Menu = () => {
             Found {filteredItems.length} items for "{debouncedSearchQuery}"
             <button
               onClick={() => setSearchQuery('')}
-              className="ml-2 underline text-sm text-blue-600 hover:text-blue-800"
+              className="ml-2 underline text-sm text-orange-600 hover:text-orange-700"
             >
               Clear search
             </button>
@@ -475,7 +475,7 @@ const Menu = () => {
           {debouncedSearchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+              className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
             >
               Clear search
             </button>
@@ -555,7 +555,7 @@ const Menu = () => {
               <button
                 onClick={loadMoreItems}
                 disabled={isLoadingMore}
-                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoadingMore ? (
                   <div className="flex items-center gap-2">
@@ -578,7 +578,7 @@ const Menu = () => {
           <p className="text-sm mb-3 text-gray-600">Ready to place your delivery order?</p>
           <Link 
             to="/delivery-cart"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+            className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
           >
             Go to Delivery Cart
           </Link>
