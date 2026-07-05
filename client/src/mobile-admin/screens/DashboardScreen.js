@@ -3,7 +3,7 @@ import { apiService } from '../../services/apiService';
 import KPICard from '../components/KPICard';
 import OrderCard from '../components/OrderCard';
 
-const DashboardScreen = ({ onOpenOrder, onGoToOrders, onGoToTables }) => {
+const DashboardScreen = ({ onOpenOrder, onGoToOrders, onGoToTables, refreshKey = 0, liveOrders = [] }) => {
   const [orders, setOrders] = useState([]);
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +27,12 @@ const DashboardScreen = ({ onOpenOrder, onGoToOrders, onGoToTables }) => {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  // Refetch on mount, on the header refresh button (refreshKey), and on any
+  // live socket order event (liveOrders identity changes per event). fetchAll
+  // doesn't reset `loading`, so these refetches update in place without a
+  // skeleton flash. [live-admin]
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchAll(); }, [refreshKey, liveOrders]);
 
   const kpis = useMemo(() => {
     const today = new Date().toDateString();

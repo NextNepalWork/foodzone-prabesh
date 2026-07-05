@@ -1,7 +1,7 @@
 // Food Zone PWA Service Worker - Enhanced for Instant Table Loading
-const CACHE_NAME = 'food-zone-v2.11.0';
-const API_CACHE = 'food-zone-api-v2.11';
-const TABLE_CACHE = 'food-zone-table-v2.11';
+const CACHE_NAME = 'food-zone-v2.12.0';
+const API_CACHE = 'food-zone-api-v2.12';
+const TABLE_CACHE = 'food-zone-table-v2.12';
 
 // Global variables
 let keepAliveInterval = null;
@@ -169,10 +169,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Settings must always reflect the latest admin changes — use network-first
-  // (fall back to cache only when offline) so address/hours/etc. propagate
-  // immediately instead of being served stale from the cache-first path below.
-  if (url.pathname.startsWith('/api/settings')) {
+  // API requests are network-first: live data (orders, tables, settings,
+  // menu edits) must always reflect the server, not yesterday's cache.
+  // The cache is only a fallback for when the network is down, which keeps
+  // the offline story (incl. the hardcoded fallback menu) intact. The old
+  // cache-first strategy here was why the admin showed stale orders until
+  // a manual refresh. [live-admin]
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request).then(networkResponse => {
         if (networkResponse && networkResponse.ok && networkResponse.status === 200) {
@@ -180,57 +183,15 @@ self.addEventListener('fetch', (event) => {
           caches.open(API_CACHE).then(cache => cache.put(event.request, copy));
         }
         return networkResponse;
-      }).catch(() => caches.open(API_CACHE).then(cache => cache.match(event.request)))
-    );
-    return;
-  }
-
-  // Handle API requests with cache-first strategy for instant loading
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      caches.open(API_CACHE).then(cache => {
-        return cache.match(event.request).then(cachedResponse => {
-          if (cachedResponse) {
-            // Return cached response immediately for instant loading
-            const response = cachedResponse.clone();
-            
-            // Update cache in background without blocking
-            fetch(event.request).then(networkResponse => {
-              // Only cache successful GET requests with status 200
-              if (networkResponse && 
-                  networkResponse.ok && 
-                  networkResponse.status === 200 &&
-                  event.request.method === 'GET') {
-                cache.put(event.request, networkResponse.clone());
-              }
-            }).catch(() => {
-              // Network failed, cached response is still valid
-            });
-            
-            return response;
+      }).catch(() =>
+        caches.open(API_CACHE).then(cache => cache.match(event.request)).then(cached => {
+          if (cached) return cached;
+          if (url.pathname === '/api/menu') {
+            return caches.open(TABLE_CACHE).then(tableCache => tableCache.match('/fallback-menu'));
           }
-          
-          // No cache, fetch from network and cache
-          return fetch(event.request).then(networkResponse => {
-            // Only cache successful GET requests with status 200 (not partial 206)
-            if (networkResponse && 
-                networkResponse.ok && 
-                networkResponse.status === 200 &&
-                event.request.method === 'GET') {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch(() => {
-            // Return fallback menu for critical endpoints
-            if (url.pathname === '/api/menu') {
-              return caches.open(TABLE_CACHE).then(tableCache => {
-                return tableCache.match('/fallback-menu');
-              });
-            }
-            throw new Error('Network unavailable');
-          });
-        });
-      })
+          throw new Error('Network unavailable');
+        })
+      )
     );
     return;
   }

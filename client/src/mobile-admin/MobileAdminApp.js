@@ -61,6 +61,9 @@ const MobileAdminApp = () => {
   // --- Live data -------------------------------------------------------
   const [liveOrders, setLiveOrders] = useState([]);
   const [badges, setBadges] = useState({ orders: 0, tables: 0 });
+  // Soft-refresh counter for the dashboard (replaces the old full-page
+  // reload, which felt slow and dropped all in-memory state). [live-admin]
+  const [dashRefreshKey, setDashRefreshKey] = useState(0);
 
   // --- UI state --------------------------------------------------------
   const [orderDetail, setOrderDetail] = useState(null);
@@ -141,14 +144,21 @@ const MobileAdminApp = () => {
       setLiveOrders((prev) => [order, ...prev].slice(0, 50));
       setBadges((b) => ({ ...b, orders: (b.orders || 0) + 1 }));
     });
-    socket.on('orderUpdated', (order) => {
-      setLiveOrders((prev) => {
-        const i = prev.findIndex((o) => (o.id || o._id) === (order.id || order._id));
-        if (i === -1) return [order, ...prev].slice(0, 50);
-        const copy = prev.slice();
-        copy[i] = order;
-        return copy;
-      });
+    // The backend emits `orderStatusUpdated` with a partial payload
+    // ({ orderId, status, payment_status, ... }), not a full order object.
+    // This previously listened for a non-existent `orderUpdated` event, so
+    // status changes never reached the mobile admin live. [live-admin]
+    socket.on('orderStatusUpdated', ({ orderId, status, payment_status }) => {
+      setLiveOrders((prev) =>
+        prev.map((o) =>
+          (o.id || o._id) === orderId
+            ? { ...o, status, ...(payment_status ? { payment_status } : {}) }
+            : o,
+        ),
+      );
+    });
+    socket.on('orderDeleted', ({ orderId }) => {
+      setLiveOrders((prev) => prev.filter((o) => (o.id || o._id) !== orderId));
     });
     socket.on('tableCleared', () => {
       setBadges((b) => ({ ...b, tables: 0 }));
@@ -218,6 +228,8 @@ const MobileAdminApp = () => {
             onOpenOrder={setOrderDetail}
             onGoToOrders={() => onTabChange('orders')}
             onGoToTables={() => onTabChange('tables')}
+            refreshKey={dashRefreshKey}
+            liveOrders={liveOrders}
           />
         );
         break;
@@ -249,7 +261,7 @@ const MobileAdminApp = () => {
         leftIcon={inSecondary ? '‹' : null}
         onLeft={inSecondary ? pop : null}
         rightIcon={!inSecondary && activeTab === 'dashboard' ? '🔄' : null}
-        onRight={!inSecondary && activeTab === 'dashboard' ? () => window.location.reload() : null}
+        onRight={!inSecondary && activeTab === 'dashboard' ? () => setDashRefreshKey((k) => k + 1) : null}
         activeTab={inSecondary ? null : activeTab}
         onTabChange={onTabChange}
         badges={badges}

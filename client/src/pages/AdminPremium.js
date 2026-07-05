@@ -665,15 +665,22 @@ const AdminPremium = () => {
 
           newSocket.on('newOrder', (order) => {
             setOrders((prev) => [...prev, order]);
+            // Child views (OrdersManagement etc.) fetch their own data and
+            // only refetch when refreshTrigger changes — bump it so socket
+            // events reach them live instead of waiting for the manual
+            // refresh button. [live-admin]
+            setRefreshTrigger((prev) => prev + 1);
             if (order.order_type === 'delivery') audioManager.playDeliveryOrderSound();
             else audioManager.playTableOrderSound();
             pushToast(`New ${order.order_type || 'dine-in'} order received`, 'info');
           });
           newSocket.on('orderStatusUpdated', ({ orderId, status }) => {
             setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+            setRefreshTrigger((prev) => prev + 1);
           });
           newSocket.on('tableCleared', ({ tableId }) => {
             setOrders((prev) => prev.filter((o) => o.table_id !== tableId));
+            setRefreshTrigger((prev) => prev + 1);
           });
         } catch (e) {
           console.error('Auth verification failed:', e);
@@ -692,6 +699,19 @@ const AdminPremium = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
+
+  // Polling fallback: while the socket is down (flaky wifi, server restart),
+  // refetch every 30s so the admin still converges on live data instead of
+  // silently freezing until someone clicks Refresh. [live-admin]
+  useEffect(() => {
+    if (!isAuthenticated || socketConnected) return;
+    const t = setInterval(() => {
+      fetchOrders();
+      setRefreshTrigger((prev) => prev + 1);
+    }, 30000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, socketConnected]);
 
   async function fetchOrders() {
     try {
