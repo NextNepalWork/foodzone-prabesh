@@ -159,10 +159,12 @@ class CacheManager {
   // Notify server to clear table sessions
   async clearServerSessions() {
     try {
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('staffToken');
       const response = await fetch(getApiUrl('/api/clear-table-sessions'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           action: 'cleanup',

@@ -1,7 +1,7 @@
 // Food Zone PWA Service Worker - Enhanced for Instant Table Loading
-const CACHE_NAME = 'food-zone-v2.12.0';
-const API_CACHE = 'food-zone-api-v2.12';
-const TABLE_CACHE = 'food-zone-table-v2.12';
+const CACHE_NAME = 'food-zone-v3.0.0';
+const API_CACHE = 'food-zone-api-v3.0';
+const TABLE_CACHE = 'food-zone-table-v3.0';
 
 // Global variables
 let keepAliveInterval = null;
@@ -169,6 +169,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // PWA manifests are network-first — each surface (/admin, /pos, …) swaps
+  // in its own manifest, and a stale cached one would break install/start_url.
+  if (url.pathname.startsWith('/manifest')) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   // API requests are network-first: live data (orders, tables, settings,
   // menu edits) must always reflect the server, not yesterday's cache.
   // The cache is only a fallback for when the network is down, which keeps
@@ -253,9 +262,8 @@ async function syncKitchenOrders() {
   try {
     console.log('📡 Syncing kitchen orders in background...');
     
-    // Use the current origin instead of hardcoded URL
-    const apiUrl = self.location.origin.replace(':3005', ':3000');
-    const response = await fetch(`${apiUrl}/api/orders/today`);
+    // Relative fetch — same origin as the app (proxied/redirected to the API)
+    const response = await fetch('/api/orders/today');
     if (response.ok) {
       const orders = await response.json();
       
@@ -276,107 +284,78 @@ async function syncKitchenOrders() {
   }
 }
 
-// Enhanced audio alert function for service worker
-function playTripleBellAlert() {
-  try {
-    // Create audio context in service worker
-    const audioContext = new (self.AudioContext || self.webkitAudioContext)();
-    
-    // Play 3 bell sounds with different frequencies
-    const frequencies = [800, 1000, 800];
-    const interval = 0.8;
-
-    for (let i = 0; i < 3; i++) {
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      const filterNode = audioContext.createBiquadFilter();
-
-      oscillator.connect(filterNode);
-      filterNode.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      // Configure bell sound
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(frequencies[i], audioContext.currentTime + (i * interval));
-      oscillator.frequency.exponentialRampToValueAtTime(frequencies[i] * 0.5, audioContext.currentTime + (i * interval) + 0.6);
-
-      // Add filter for bell-like resonance
-      filterNode.type = 'bandpass';
-      filterNode.frequency.setValueAtTime(frequencies[i], audioContext.currentTime + (i * interval));
-      filterNode.Q.setValueAtTime(10, audioContext.currentTime + (i * interval));
-
-      // Volume envelope (loud start, quick fade)
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime + (i * interval));
-      gainNode.gain.linearRampToValueAtTime(0.9, audioContext.currentTime + (i * interval) + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.1, audioContext.currentTime + (i * interval) + 0.2);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + (i * interval) + 0.6);
-
-      oscillator.start(audioContext.currentTime + (i * interval));
-      oscillator.stop(audioContext.currentTime + (i * interval) + 0.6);
-    }
-  } catch (error) {
-    console.warn('Service worker audio alert failed:', error);
-  }
+// Ask every open app window to play the alert sound. Service workers cannot
+// play audio themselves (no AudioContext in a worker), so pages listen for
+// this message and play the mp3 via soundManager.
+function broadcastPlayAlert(sound, tag) {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    clientList.forEach((client) => {
+      client.postMessage({ type: 'PLAY_ALERT', sound: sound || 'new-order', tag: tag || 'order' });
+    });
+  });
 }
 
 // Handle push events for background notifications
 self.addEventListener('push', function(event) {
-  console.log('Push event received:', event);
-  
-  let notificationData = {
-    title: '🍽️ Food Zone - New Order!',
-    body: 'You have a new order',
-    icon: '/icon-192x192.png',
-    badge: '/icon-192x192.png',
-    vibrate: [400, 200, 400, 200, 400, 200, 400], // Extended vibration
-    requireInteraction: true,
-    silent: false,
-    tag: 'food-zone-order',
-    renotify: true,
-    actions: [
-      { action: 'view', title: 'View Order' },
-      { action: 'dismiss', title: 'Dismiss' }
-    ]
-  };
-
+  let data = {};
   if (event.data) {
-    try {
-      const data = event.data.json();
-      notificationData.title = data.title || notificationData.title;
-      notificationData.body = data.body || notificationData.body;
-    } catch (e) {
-      console.log('Could not parse push data:', e);
-    }
+    try { data = event.data.json(); } catch (e) { /* plain-text push */ }
   }
 
-  // Play triple bell alert for background notifications
-  playTripleBellAlert();
+  // Deep link for the click handler: server sends url/orderId; default to the
+  // reception desk where incoming orders are handled.
+  const targetUrl = data.url || (data.orderId ? `/reception?order=${data.orderId}` : '/reception');
+  const tag = data.orderId ? `food-zone-order-${data.orderId}` : 'food-zone-order';
 
   event.waitUntil(
-    self.registration.showNotification(notificationData.title, {
-      body: notificationData.body,
-      icon: notificationData.icon,
-      badge: notificationData.badge,
-      vibrate: notificationData.vibrate,
-      requireInteraction: notificationData.requireInteraction,
-      silent: notificationData.silent,
-      tag: notificationData.tag,
-      renotify: notificationData.renotify,
-      actions: notificationData.actions
-    })
+    Promise.all([
+      broadcastPlayAlert('new-order', tag),
+      self.registration.showNotification(data.title || '🍽️ New Order!', {
+        body: data.body || 'You have a new order',
+        icon: '/icon-192x192.png',
+        badge: '/icon-192x192.png',
+        vibrate: [400, 200, 400, 200, 400, 200, 400],
+        requireInteraction: true,
+        silent: false, // play the system notification sound too
+        tag: tag,
+        renotify: true,
+        data: { url: targetUrl, orderId: data.orderId || null },
+        actions: [
+          { action: 'view', title: 'View Order' },
+          { action: 'dismiss', title: 'Dismiss' }
+        ]
+      })
+    ])
   );
 });
 
-// Handle notification clicks
+// Notification click → land on the order. Focus an existing app window and
+// navigate it; only open a new window when none is open.
 self.addEventListener('notificationclick', (event) => {
-  console.log('🔔 Notification clicked');
   event.notification.close();
+  if (event.action === 'dismiss') return;
 
-  if (event.action === 'view') {
-    event.waitUntil(
-      clients.openWindow('/staff')
-    );
-  }
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/reception';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Prefer a window already on a staff surface, else any app window
+      const staffClient = clientList.find((c) =>
+        ['/reception', '/admin', '/staff', '/pos', '/kitchen-tv'].some((p) => new URL(c.url).pathname.startsWith(p))
+      );
+      const client = staffClient || clientList[0];
+      if (client) {
+        return client.focus().then((focused) => {
+          // Tell the SPA to route to the order (full navigate as fallback)
+          focused.postMessage({ type: 'NAVIGATE', url: targetUrl });
+          if ('navigate' in focused && !staffClient) {
+            return focused.navigate(targetUrl).catch(() => {});
+          }
+        });
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
 });
 
 // Handle messages from main thread
@@ -391,22 +370,22 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data && event.data.type === 'NEW_ORDER') {
-    const { orderType, tableId, totalAmount, orderInfo } = event.data;
+    const { orderType, tableId, totalAmount, orderInfo, orderId } = event.data;
     const displayInfo = orderInfo || (orderType === 'dine-in' ? `Table ${tableId}` : 'Delivery');
-    
-    // Play triple bell alert for background notifications
-    playTripleBellAlert();
-    
-    // Show persistent notification for lock screen
-    self.registration.showNotification('🍽️ Food Zone - New Order!', {
+    const targetUrl = orderId ? `/reception?order=${orderId}` : '/reception';
+
+    // Show persistent notification for lock screen (sound is played by the
+    // page that posted this message via soundManager, not by the SW)
+    self.registration.showNotification('🍽️ New Order!', {
       body: `${displayInfo} - NPR ${totalAmount || 'N/A'}`,
       icon: '/icon-192x192.png',
       badge: '/icon-192x192.png',
       vibrate: [400, 200, 400, 200, 400, 200, 400],
       requireInteraction: true,
       silent: false,
-      tag: 'food-zone-order-' + Date.now(),
+      tag: orderId ? `food-zone-order-${orderId}` : 'food-zone-order-' + Date.now(),
       renotify: true,
+      data: { url: targetUrl, orderId: orderId || null },
       actions: [
         { action: 'view', title: 'View Order' },
         { action: 'dismiss', title: 'Dismiss' }

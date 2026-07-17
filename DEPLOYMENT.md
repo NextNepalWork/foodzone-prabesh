@@ -1,190 +1,81 @@
-# Food Zone - Railway Deployment Guide
+# Deployment Runbook — one restaurant, one deployment
 
-## 🚀 Quick Deploy to Railway
+Backend on **Railway** (Express + PostgreSQL + Socket.IO), frontend on **Netlify or Vercel** (static React build). Any equivalent hosts work — the app only needs Node 20+, PostgreSQL, and a static host.
 
-### Prerequisites
-- Railway account (https://railway.app)
-- GitHub repository connected
-- PostgreSQL database on Railway
+## 1. Backend (Railway)
 
-### Step 1: Create New Project on Railway
+1. New Project → Deploy from GitHub repo. `railway.toml` builds and starts from `server/` (healthcheck `/api/health`).
+2. Add **PostgreSQL** to the project; Railway injects `DATABASE_URL` automatically.
+3. Initialize the schema once (from your machine):
+   ```bash
+   psql "$DATABASE_URL" -f create-all-tables.sql
+   ```
+4. Set service variables:
+   ```
+   NODE_ENV=production
+   JWT_SECRET=<64+ random chars>          # openssl rand -hex 48
+   INITIAL_MANAGER_USERNAME=admin
+   INITIAL_MANAGER_PASSWORD=<strong password>   # remove after first login
+   ALLOWED_ORIGINS=https://<restaurant-domain>,https://www.<restaurant-domain>
+   VAPID_PUBLIC_KEY=...                   # npx web-push generate-vapid-keys
+   VAPID_PRIVATE_KEY=...
+   VAPID_SUBJECT=mailto:admin@<restaurant-domain>
+   SMTP_HOST=smtp.hostinger.com           # or your provider
+   SMTP_PORT=465
+   SMTP_SECURE=true
+   SMTP_USER=orders@<restaurant-domain>
+   SMTP_PASS=<smtp password>
+   EMAIL_FROM=orders@<restaurant-domain>
+   ```
+5. Deploy. First boot seeds the Manager account and logs `Seeded initial Manager account`.
 
-1. Go to https://railway.app
-2. Click "New Project"
-3. Select "Deploy from GitHub repo"
-4. Choose `NextNepalWork/foodzone-prabesh`
+## 2. Frontend (Netlify or Vercel)
 
-### Step 2: Add PostgreSQL Database
+- Build: `cd client && npm run build`, publish `client/build` (root `netlify.toml` already does this; `client/vercel.json` for Vercel).
+- Environment (build-time):
+  ```
+  REACT_APP_API_URL=https://<railway-backend-url>
+  REACT_APP_SOCKET_URL=wss://<railway-backend-url>
+  ```
+- Point the restaurant domain's DNS at the frontend host; add the domain to the backend's `ALLOWED_ORIGINS`.
 
-1. In your Railway project, click "New"
-2. Select "Database" → "PostgreSQL"
-3. Railway will automatically create a database
+> Alternative single-host mode: copy `client/build/*` into `server/public/` and let the backend serve the SPA (`NODE_ENV=production` enables the catch-all route). Remember to re-copy after every client change — the PWA manifests and `sw.js` live in that build.
 
-### Step 3: Configure Environment Variables
+## 3. Restaurant onboarding
 
-Add these environment variables to your Railway service:
+1. `/admin` → log in with the seeded Manager account → change the password (Admin → Staff → reset password), then remove `INITIAL_MANAGER_PASSWORD` from the env.
+2. Settings → Business: name, logo, brand color, phone, address, currency, VAT/service charge, operating hours. These drive the customer app, receipts, and PWA branding.
+3. Settings → Integrations: upload payment QR codes (eSewa / Khalti / FonePay).
+4. Settings → Notifications: notification email + per-order-type email toggles; use **Send test email** to verify SMTP.
+5. Admin → Staff: create Cashier / Chef / Waiter / Kitchen Helper accounts.
+6. Admin → Menu: enter or import the menu (`server/scripts/import-menu-from-csv.js`).
+7. Settings → Tables: set table count, print QR codes for tables.
 
-```env
-# Database (automatically set by Railway when you add PostgreSQL)
-DATABASE_URL=${DATABASE_URL}
+## 4. Station setup (PWAs)
 
-# Application
-NODE_ENV=production
-PORT=3000
+On each device, open the page for its role and use the browser's **Install app / Add to Home Screen** — the installed app always opens on that page:
 
-# JWT Secret (generate a secure random string)
-JWT_SECRET=your-super-secure-jwt-secret-here
+| Station | Install from |
+|---|---|
+| Cashier counter | `/pos` |
+| Reception desk | `/reception` |
+| Kitchen display | `/kitchen-tv` |
+| Manager phone/desktop | `/admin` |
+| Waiter phones | `/staff` |
 
-# Admin Credentials
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=FoodZone2024!
+After installing, tap **Enable sound** (amber banner) once so order alerts ring, and allow notifications when prompted (push notifications deep-link to the order when tapped).
 
-# Staff Credentials
-MANAGER_USERNAME=manager
-MANAGER_PASSWORD=Manager2024!
-CHEF_USERNAME=chef
-CHEF_PASSWORD=Chef2024!
-WAITER_USERNAME=waiter
-WAITER_PASSWORD=Waiter2024!
-CASHIER_USERNAME=cashier
-CASHIER_PASSWORD=Cashier2024!
+## 5. Smoke test
 
-# CORS (add your frontend domain)
-CORS_ORIGIN=https://foodzone.com.np,https://www.foodzone.com.np
-```
+- Customer: scan a table QR (`/<tableId>`), place an order.
+- Kitchen: order appears on `/kitchen-tv` instantly with a chime.
+- POS: ring up a takeaway sale with a discount, cash payment → receipt + KOT print, sale visible in Daybook and Admin → Reports.
+- Reception: take payment on the table order, clear the table, close the day.
+- Email: test-email button round-trips; order email arrives if enabled.
+- `GET https://<backend>/api/health` returns OK (Railway healthcheck uses this).
 
-### Step 4: Deploy Backend to Railway
+## Notes
 
-Railway will automatically:
-1. Install server dependencies (`npm install` in server folder)
-2. Start the server with `node server.js`
-
-**Note**: Frontend is deployed separately (see Step 7)
-
-### Step 5: Set Up Custom Domain for Backend
-
-1. In Railway project settings, go to "Settings" → "Domains"
-2. Add your custom domain: `api.foodzone.com.np`
-3. Update your DNS records as instructed by Railway
-
-### Step 6: Deploy Frontend Separately
-
-Your frontend (`foodzone.com.np`) should be deployed to a separate hosting service:
-
-**Recommended Options:**
-- **Vercel** (recommended for React apps)
-- **Netlify**
-- **Cloudflare Pages**
-
-**Build Settings:**
-```bash
-# Root directory
-client
-
-# Build command
-npm install && npm run build
-
-# Output directory
-build
-```
-
-**Environment Variables for Frontend:**
-```env
-REACT_APP_API_URL=https://api.foodzone.com.np
-REACT_APP_SOCKET_URL=https://api.foodzone.com.np
-GENERATE_SOURCEMAP=false
-```
-
-### Step 7: Configure Frontend Domain
-
-Point `foodzone.com.np` to your frontend hosting provider (Vercel/Netlify/etc.)
-
-## 🌐 Domain Configuration
-
-### Your Setup:
-- **Frontend**: `foodzone.com.np` (hosted separately - Vercel/Netlify/etc.)
-- **Backend**: `api.foodzone.com.np` (Railway)
-
-### DNS Records:
-Add these records in your DNS provider:
-
-**Backend (Railway):**
-```
-Type: CNAME
-Name: api
-Value: <your-railway-domain>.railway.app
-```
-
-**Frontend (Your hosting provider):**
-```
-Type: A or CNAME
-Name: @
-Value: <your-frontend-hosting-ip-or-domain>
-```
-
-## 📋 Post-Deployment Checklist
-
-- [ ] Database connected and migrations run
-- [ ] Environment variables set (see RAILWAY_ENV_VARIABLES.md)
-- [ ] Custom domain configured (api.foodzone.com.np)
-- [ ] DNS records updated
-- [ ] Frontend deployed separately to foodzone.com.np
-- [ ] Frontend pointing to correct API URL (https://api.foodzone.com.np)
-- [ ] CORS configured for foodzone.com.np
-- [ ] Test admin login
-- [ ] Test order creation
-- [ ] Test reports & analytics
-- [ ] Test daybook functionality
-
-## 🔧 Troubleshooting
-
-### Database Connection Issues
-- Check if `DATABASE_URL` is set correctly
-- Verify PostgreSQL service is running
-- Check Railway logs for connection errors
-
-### Build Failures
-- Check Railway build logs
-- Verify all dependencies are in `package.json`
-- Ensure Node version compatibility (18.x)
-
-### API Not Responding
-- Check if server is running in Railway logs
-- Verify PORT environment variable
-- Check CORS settings
-
-## 📊 Monitoring
-
-View logs in Railway:
-```bash
-# In Railway dashboard
-Project → Service → Deployments → View Logs
-```
-
-## 🔄 Continuous Deployment
-
-Railway automatically deploys when you push to `main` branch:
-
-```bash
-git add .
-git commit -m "Your changes"
-git push origin main
-```
-
-Railway will detect the push and redeploy automatically!
-
-## 🎯 Current Status
-
-✅ Code pushed to GitHub: https://github.com/NextNepalWork/foodzone-prabesh
-✅ Railway configuration added
-✅ Production API URL configured
-✅ All report endpoints fixed
-✅ Daybook transactions working
-✅ Date range support added
-
-## 📞 Support
-
-For issues, check:
-- Railway logs
-- GitHub repository issues
-- Server logs in Railway dashboard
+- Node 20+ (`engines` in package.json, `nixpacks.toml`, `Dockerfile` are aligned).
+- Service-worker cache is versioned (`client/public/sw.js` `CACHE_NAME`); bump it on releases — installed clients auto-update via SKIP_WAITING.
+- If credentials ever leak, rotate: DB password, `JWT_SECRET`, SMTP password, VAPID keys, staff passwords.

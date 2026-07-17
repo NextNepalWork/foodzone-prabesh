@@ -286,7 +286,7 @@ export const fetchApi = {
       console.log('📤 Request data:', data);
       
       // Get auth token from localStorage
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('staffToken');
       const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -345,7 +345,7 @@ export const fetchApi = {
       console.log('📤 Request data:', data);
       
       // Get auth token from localStorage
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('staffToken');
       const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -404,7 +404,7 @@ export const fetchApi = {
       console.log('📤 Request data:', data);
       
       // Get auth token from localStorage
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('staffToken');
       const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -462,7 +462,7 @@ export const fetchApi = {
       console.log('🔄 Making DELETE request to:', url);
       
       // Get auth token from localStorage
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('staffToken');
       const headers = {
         'Content-Type': 'application/json',
         ...options.headers,

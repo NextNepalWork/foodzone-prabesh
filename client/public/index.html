@@ -89,7 +89,34 @@
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link id="app-manifest" rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <script>
+      // Per-surface PWA manifests: installing the app from /admin, /pos,
+      // /reception, /staff or /kitchen-tv installs a dedicated app that
+      // starts on that page (each manifest has its own id + start_url).
+      // Runs before the browser evaluates installability on hard loads.
+      (function () {
+        var map = [
+          ['/admin', '/manifest-admin.json'],
+          ['/pos', '/manifest-pos.json'],
+          ['/reception', '/manifest-reception.json'],
+          ['/staff', '/manifest-staff.json'],
+          ['/kitchen-tv', '/manifest-kitchen.json'],
+        ];
+        function manifestFor(path) {
+          for (var i = 0; i < map.length; i++) {
+            if (path === map[i][0] || path.indexOf(map[i][0] + '/') === 0) return map[i][1];
+          }
+          return '/manifest.json';
+        }
+        window.__setManifestForPath = function (path) {
+          var link = document.getElementById('app-manifest');
+          var href = manifestFor(path);
+          if (link && link.getAttribute('href') !== href) link.setAttribute('href', href);
+        };
+        window.__setManifestForPath(window.location.pathname);
+      })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Food Zone Restaurant" />

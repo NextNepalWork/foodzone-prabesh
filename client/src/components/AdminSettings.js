@@ -229,6 +229,9 @@ const AdminSettings = () => {
                 {section.id === 'tables' && (
                   <QRCodeUploadEditor values={values} update={update} flash={flash} uiSettings={uiSettings} />
                 )}
+                {section.id === 'notifications' && (
+                  <EmailTestPanel notifyEmail={values['notify.email_address']} flash={flash} />
+                )}
 
                 {/* Floating save reminder */}
                 {dirtyKeys.length > 0 && (
@@ -255,6 +258,69 @@ const AdminSettings = () => {
         <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg text-sm font-semibold text-white z-50 ${
           toast.tone === 'error' ? 'bg-rose-600' : toast.tone === 'info' ? 'bg-slate-700' : 'bg-emerald-600'
         }`}>{toast.message}</div>
+      )}
+    </div>
+  );
+};
+
+/* ============================================================
+   Email test panel — verify SMTP from the notifications section
+   ============================================================ */
+const EmailTestPanel = ({ notifyEmail, flash }) => {
+  const [to, setTo] = useState(notifyEmail || '');
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    fetchApi.get('/api/admin/email-status')
+      .then((r) => setStatus(r.status || r?.data?.status || null))
+      .catch(() => {});
+  }, []);
+
+  const sendTest = async () => {
+    if (!to.trim()) { flash('Enter a recipient email first', 'error'); return; }
+    setSending(true);
+    try {
+      await fetchApi.post('/api/admin/test-email', { to: to.trim() });
+      flash(`Test email sent to ${to.trim()}`);
+      const r = await fetchApi.get('/api/admin/email-status').catch(() => null);
+      if (r) setStatus(r.status || r?.data?.status || null);
+    } catch (err) {
+      flash(err?.response?.data?.error || 'Test email failed — check SMTP settings', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-5">
+      <div className="text-sm font-bold text-slate-900 mb-1">📧 Email delivery check</div>
+      <p className="text-xs text-slate-500 mb-3">
+        Sends a test email through the configured SMTP server so you can confirm order notifications will arrive.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="recipient@example.com"
+          className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+        />
+        <button
+          onClick={sendTest}
+          disabled={sending}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {sending ? 'Sending…' : 'Send test email'}
+        </button>
+      </div>
+      {status && (
+        <div className="mt-3 text-xs text-slate-500 space-y-0.5">
+          <div>SMTP configured: <b className={status.configured ? 'text-emerald-600' : 'text-rose-600'}>{status.configured ? 'yes' : 'no'}</b></div>
+          <div>Sent: <b>{status.sent}</b> · Failed: <b className={status.failed ? 'text-rose-600' : ''}>{status.failed}</b></div>
+          {status.lastSuccessAt && <div>Last success: {new Date(status.lastSuccessAt).toLocaleString()}</div>}
+          {status.lastError && <div className="text-rose-600">Last error: {status.lastError} ({status.lastErrorAt ? new Date(status.lastErrorAt).toLocaleString() : ''})</div>}
+        </div>
       )}
     </div>
   );

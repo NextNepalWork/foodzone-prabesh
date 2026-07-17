@@ -132,11 +132,11 @@ class PushNotificationManager {
     try {
       const notification = new Notification(title, notificationOptions);
       
-      // Import and play enhanced audio alert
-      import('../utils/audioAlerts.js').then(({ default: audioAlertManager }) => {
-        audioAlertManager.playNotificationAlert();
+      // Play the alert through the shared sound engine
+      import('./soundManager').then(({ default: soundManager }) => {
+        soundManager.play('new-order');
       }).catch(error => {
-        console.warn('Audio alert import failed:', error);
+        console.warn('Sound manager import failed:', error);
       });
       
       notification.onclick = function() {
@@ -151,7 +151,7 @@ class PushNotificationManager {
   }
 
   // Initialize push notifications
-  async initialize() {
+  async initialize(role = 'staff') {
     try {
       const hasPermission = await this.requestPermission();
       if (!hasPermission) {
@@ -160,7 +160,7 @@ class PushNotificationManager {
 
       await this.registerServiceWorker();
       const subscription = await this.subscribe();
-      await this.sendSubscriptionToServer(subscription);
+      await this.sendSubscriptionToServer(subscription, role);
 
       console.log('Push notifications initialized successfully');
       return true;

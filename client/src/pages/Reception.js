@@ -5,6 +5,9 @@ import io from 'socket.io-client';
 import PushNotificationManager from '../utils/pushNotifications';
 import OfflineStorageManager from '../utils/offlineStorage';
 import ReceptionPayment from '../components/ReceptionPayment';
+import { printReceipt } from '../utils/printing';
+import soundManager from '../utils/soundManager';
+import SoundEnableBanner from '../components/SoundEnableBanner';
 import { useTableCount } from '../hooks/useSettings';
 
 const Reception = () => {
@@ -15,6 +18,7 @@ const Reception = () => {
   const [activeOrders, setActiveOrders] = useState([]);
   const [tableStatuses, setTableStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [flaggedOrders, setFlaggedOrders] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('adminToken') || localStorage.getItem('staffToken');
   });
@@ -98,7 +102,8 @@ const Reception = () => {
           fetchAllOrders(),
           fetchTableStatuses(),
           fetchDayStatus(),
-          fetchTransactionData()
+          fetchTransactionData(),
+          fetchFlaggedOrders()
         ]);
         
         // Initialize PWA features asynchronously (non-blocking)
@@ -147,10 +152,27 @@ const Reception = () => {
       newSocket.on('orderStatusUpdated', (data) => {
         console.log('🔄 Real-time: Order status updated, refreshing orders...');
         fetchAllOrders().catch(err => console.warn('Failed to refresh orders:', err));
+        if (data && ['ready', 'completed', 'cancelled'].includes(data.status)) {
+          // orderId arrives as a string (from req.params); order ids are numeric — coerce both sides
+          setFlaggedOrders((prev) => prev.filter((o) => String(o.id) !== String(data.orderId)));
+        }
+      });
+
+      newSocket.on('orderAlert', (alert) => {
+        console.log('🚨 Kitchen alert:', alert);
+        setFlaggedOrders((prev) => [...prev.filter((o) => String(o.id) !== String(alert.orderId)), {
+          id: alert.orderId,
+          order_type: alert.orderType,
+          table_id: alert.tableId,
+          customer_name: alert.customerName,
+          created_at: alert.createdAt,
+          alertLevel: alert.alertLevel,
+        }]);
       });
       
       newSocket.on('newOrder', (order) => {
         console.log('🔄 Real-time: New order received, refreshing orders...');
+        soundManager.play(order?.order_type === 'delivery' ? 'delivery-order' : 'table-order', order?.id ? `order-${order.id}` : undefined);
         fetchAllOrders().catch(err => console.warn('Failed to refresh orders:', err));
         fetchTableStatuses().catch(err => console.warn('Failed to refresh tables:', err));
       });
@@ -214,6 +236,15 @@ const Reception = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchFlaggedOrders = async () => {
+    try {
+      const response = await fetchApi.get('/api/orders/flagged');
+      setFlaggedOrders(response?.orders || []);
+    } catch (err) {
+      console.warn('Failed to fetch flagged orders:', err);
+    }
+  };
 
   const fetchAllOrders = async () => {
     try {
@@ -329,7 +360,7 @@ const Reception = () => {
       setPushManager(manager);
       
       if (manager.isSupported()) {
-        const initialized = await manager.initialize();
+        const initialized = await manager.initialize('Cashier');
         setPushEnabled(initialized);
         console.log(initialized ? 'Reception PWA: Push notifications enabled' : 'Reception PWA: Local notifications only');
       }
@@ -449,271 +480,9 @@ const Reception = () => {
   };
 
   const handlePrintOrder = (order) => {
-    console.log('🖨️ Print button clicked for order:', order.id);
-    console.log('🖨️ Order data for printing:', order);
-    console.log('🖨️ Order items:', order.items);
-    
-    // Create thermal printer optimized content
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 0;
-          }
-          
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            line-height: 1.3;
-            margin: 0;
-            padding: 3mm;
-            width: 80mm;
-            color: #000;
-            background: #fff;
-          }
-          
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          
-          .header {
-            text-align: center;
-            margin-bottom: 6px;
-            padding-bottom: 4px;
-            border-bottom: 2px solid #000;
-          }
-          
-          .restaurant-name {
-            font-size: 16px;
-            font-weight: bold;
-            margin: 2px 0;
-            letter-spacing: 1px;
-          }
-          
-          .restaurant-info {
-            font-size: 10px;
-            margin: 1px 0;
-          }
-          
-          .divider {
-            border-bottom: 1px dashed #000;
-            margin: 4px 0;
-            height: 1px;
-          }
-          
-          .order-section {
-            margin: 6px 0;
-          }
-          
-          .info-line {
-            display: flex;
-            justify-content: space-between;
-            margin: 2px 0;
-            font-size: 10px;
-          }
-          
-          .info-label {
-            font-weight: bold;
-            min-width: 50px;
-          }
-          
-          .items-header {
-            text-align: center;
-            font-weight: bold;
-            margin: 4px 0;
-            font-size: 12px;
-          }
-          
-          .item-line {
-            display: flex;
-            justify-content: space-between;
-            margin: 1px 0;
-            font-size: 10px;
-          }
-          
-          .item-name {
-            flex: 1;
-            padding-right: 6px;
-          }
-          
-          .item-qty {
-            min-width: 25px;
-            text-align: center;
-          }
-          
-          .item-price {
-            min-width: 50px;
-            text-align: right;
-            font-weight: bold;
-          }
-          
-          .total-section {
-            border-top: 2px solid #000;
-            padding-top: 4px;
-            margin-top: 6px;
-            text-align: center;
-          }
-          
-          .total-amount {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 2px 0;
-          }
-          
-          .payment-info {
-            font-size: 11px;
-            font-weight: bold;
-            margin: 2px 0;
-          }
-          
-          .footer {
-            text-align: center;
-            margin-top: 6px;
-            padding-top: 4px;
-            border-top: 1px dashed #000;
-            font-size: 9px;
-          }
-          
-          .footer-line {
-            margin: 1px 0;
-          }
-          
-          @media print {
-            body { 
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <!-- Restaurant Header -->
-        <div class="header">
-          <div class="restaurant-name">FOOD ZONE</div>
-          <div class="restaurant-info">Duwakot, Bhaktapur</div>
-          <div class="restaurant-info">Phone: 9851234567</div>
-          <div class="restaurant-info">ORDER RECEIPT</div>
-        </div>
-        
-        <!-- Order Information -->
-        <div class="order-section">
-          <div class="info-line">
-            <span class="info-label">Order:</span>
-            <span>${order.order_number || `FZ-${order.id}`}</span>
-          </div>
-          <div class="info-line">
-            <span class="info-label">Date:</span>
-            <span>${new Date(order.created_at).toLocaleDateString('en-GB')}</span>
-          </div>
-          <div class="info-line">
-            <span class="info-label">Time:</span>
-            <span>${new Date(order.created_at).toLocaleTimeString('en-GB', { hour12: false })}</span>
-          </div>
-          <div class="info-line">
-            <span class="info-label">Type:</span>
-            <span>${order.order_type === 'dine-in' ? 'DINE-IN' : 'DELIVERY'}</span>
-          </div>
-          ${order.order_type === 'dine-in' && order.table_id ? `
-          <div class="info-line">
-            <span class="info-label">Table:</span>
-            <span>${order.table_id}</span>
-          </div>
-          ` : ''}
-          <div class="info-line">
-            <span class="info-label">Customer:</span>
-            <span>${order.customer_name}</span>
-          </div>
-          <div class="info-line">
-            <span class="info-label">Phone:</span>
-            <span>${order.customer_phone || order.phone || 'N/A'}</span>
-          </div>
-          ${order.delivery_address ? `
-          <div class="info-line">
-            <span class="info-label">Address:</span>
-            <span>${order.delivery_address}</span>
-          </div>
-          ` : ''}
-        </div>
-        
-        <div class="divider"></div>
-        
-        <!-- Order Items -->
-        <div class="items-header">ORDER ITEMS</div>
-        ${order.items && order.items.length > 0 ? order.items.map(item => `
-        <div class="item-line">
-          <div class="item-name">${item.menu_item_name || item.name || 'Item'}</div>
-          <div class="item-qty">x${item.quantity || 1}</div>
-          <div class="item-price">Rs.${parseFloat(item.subtotal || (item.price * item.quantity) || 0).toFixed(0)}</div>
-        </div>
-        `).join('') : '<div class="center">No items found</div>'}
-        
-        <!-- Total Section -->
-        <div class="total-section">
-          <div class="total-amount">TOTAL: Rs.${parseFloat(order.total || order.total_amount || 0).toFixed(0)}</div>
-          <div class="payment-info">
-            ${order.payment_status === 'paid' 
-              ? `PAID - ${order.payment_method?.toUpperCase() || 'CASH'}` 
-              : 'PAYMENT PENDING'}
-          </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <!-- Footer -->
-        <div class="footer">
-          <div class="footer-line bold">Thank you for choosing Food Zone!</div>
-          <div class="footer-line">Quality Food, Quick Service</div>
-          <div class="footer-line">Visit us again soon!</div>
-          <div class="footer-line">Printed: ${new Date().toLocaleString('en-GB')}</div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Try to open print window
-    try {
-      const printWindow = window.open('', '_blank', 'width=300,height=600');
-      
-      if (!printWindow) {
-        // Fallback if popup is blocked
-        console.warn('⚠️ Popup blocked, using alternative print method');
-        const printFrame = document.createElement('iframe');
-        printFrame.style.display = 'none';
-        document.body.appendChild(printFrame);
-        
-        printFrame.contentDocument.write(printContent);
-        printFrame.contentDocument.close();
-        printFrame.contentWindow.focus();
-        printFrame.contentWindow.print();
-        
-        // Remove iframe after printing
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1000);
-        return;
-      }
-      
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.focus();
-      
-      // Wait for content to load before printing
-      setTimeout(() => {
-        printWindow.print();
-        // Close window after print dialog
-        setTimeout(() => {
-          printWindow.close();
-        }, 500);
-      }, 100);
-      
-    } catch (error) {
-      console.error('❌ Print error:', error);
-      alert('Print failed. Please check if popups are allowed or try again.');
-    }
+    printReceipt(order);
   };
+
 
   const handlePaymentComplete = (updatedOrder) => {
     setShowPaymentModal(false);
@@ -1400,6 +1169,13 @@ const Reception = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <SoundEnableBanner />
+      {flaggedOrders.length > 0 && (
+        <div className="relative z-[60] w-full flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white text-sm font-semibold animate-pulse">
+          🚨 {flaggedOrders.length} kitchen order{flaggedOrders.length > 1 ? 's' : ''} delayed —
+          {flaggedOrders.some(o => o.alertLevel === 'preparing_30min' || o.alerted_30min) ? ' some overdue 30+ min, please follow up' : ' pending 15+ min without being started'}
+        </div>
+      )}
       {/* Modern Header */}
       <div className="bg-white/95 backdrop-blur-sm shadow-xl border-b border-gray-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

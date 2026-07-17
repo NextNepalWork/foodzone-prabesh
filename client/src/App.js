@@ -4,10 +4,11 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import Header from './components/Header';
 import TableBanner from './components/TableBanner';
 import FloatingCart from './components/FloatingCart';
-// import ChunkErrorBoundary from './components/ChunkErrorBoundary'; // Removed - was blocking order submissions
 import { CartProvider } from './context/CartContext';
 import { DeliveryCartProvider } from './context/DeliveryCartContext';
 import { initializeBundleOptimizations } from './utils/bundleOptimizer';
+import soundManager from './utils/soundManager';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import AdminRouter from './mobile-admin/AdminRouter';
 
 // Import critical components directly to prevent chunk loading errors
@@ -20,29 +21,26 @@ import TableOrder from './pages/TableOrder';
 const DeliveryCart = React.lazy(() => 
   import(/* webpackChunkName: "delivery" */ './pages/DeliveryCart')
 );
-const Admin = React.lazy(() => 
-  import(/* webpackChunkName: "admin" */ './pages/Admin')
-);
-const AdminMobile = React.lazy(() => 
-  import(/* webpackChunkName: "admin" */ './pages/AdminMobile')
-);
 const AdminPremium = React.lazy(() =>
   import(/* webpackChunkName: "admin" */ './pages/AdminPremium')
 );
 const StaffDashboard = React.lazy(() => 
   import(/* webpackChunkName: "staff" */ './pages/StaffDashboard')
 );
-const Reception = React.lazy(() => 
+const Reception = React.lazy(() =>
   import(/* webpackChunkName: "staff" */ './pages/Reception')
+);
+const KitchenTV = React.lazy(() =>
+  import(/* webpackChunkName: "kitchen-tv" */ './pages/KitchenTV')
+);
+const POS = React.lazy(() =>
+  import(/* webpackChunkName: "pos" */ './pages/POS')
 );
 const TableCall = React.lazy(() => 
   import(/* webpackChunkName: "table-call" */ './pages/TableCall')
 );
-const TableDashboard = React.lazy(() => 
+const TableDashboard = React.lazy(() =>
   import(/* webpackChunkName: "table-dashboard" */ './pages/TableDashboard')
-);
-const SettingsTest = React.lazy(() => 
-  import(/* webpackChunkName: "test" */ './components/SettingsTest')
 );
 
 // Ultra-minimal loading component for instant render
@@ -57,7 +55,17 @@ const LoadingSpinner = React.memo(() => (
 
 const AppContent = React.memo(() => {
   const location = useLocation();
-  
+
+  // Keep the PWA manifest in sync with the current surface so installing
+  // from /admin, /pos, /reception, /staff or /kitchen-tv installs an app
+  // that starts on that page (see the inline script in public/index.html).
+  useEffect(() => {
+    if (typeof window.__setManifestForPath === 'function') {
+      window.__setManifestForPath(location.pathname);
+    }
+  }, [location.pathname]);
+
+
   // Memoize page type checks to prevent re-calculations
   const pageType = React.useMemo(() => {
     const path = location.pathname;
@@ -70,6 +78,7 @@ const AppContent = React.memo(() => {
       isAdminPage: path.startsWith('/admin'),
       isStaffPage: path.startsWith('/staff'),
       isReceptionPage: path.startsWith('/reception'),
+      isPosPage: path.startsWith('/pos'),
       isTableOrderPage,
       isTableDashboardPage,
     };
@@ -79,6 +88,7 @@ const AppContent = React.memo(() => {
     !pageType.isAdminPage &&
     !pageType.isStaffPage &&
     !pageType.isReceptionPage &&
+    !pageType.isPosPage &&
     !pageType.isTableOrderPage &&
     !pageType.isTableDashboardPage;
   
@@ -99,18 +109,14 @@ const AppContent = React.memo(() => {
           <Route path="/tables" element={<Tables />} />
           <Route path="/delivery-cart" element={<DeliveryCart />} />
           <Route path="/call" element={<TableCall />} />
-          <Route path="/settings-test" element={<SettingsTest />} />
-          
+
           {/* Staff Role-Based Pages */}
           <Route path="/staff" element={<StaffDashboard />} /> {/* Chef & Waiter Dashboard */}
+          <Route path="/pos" element={<POS />} /> {/* Counter-sale POS — Cashier/Manager */}
           <Route path="/reception" element={<Reception />} /> {/* Cashier Dashboard */}
+          <Route path="/kitchen-tv" element={<KitchenTV />} /> {/* Kitchen TV — touch screen for Chef/Kitchen Helper */}
           <Route path="/admin" element={<AdminRouter DesktopAdmin={AdminPremium} />} /> {/* Manager Dashboard */}
-          
-          {/* Legacy Admin Routes */}
-          <Route path="/admin-premium" element={<AdminPremium />} />
-          <Route path="/admin-mobile" element={<AdminMobile />} />
-          <Route path="/admin-legacy" element={<Admin />} />
-          
+
           {/* Dynamic Table Routes */}
           <Route path="/table/:tableId/dashboard" element={<TableDashboard />} />
           <Route path="/:tableId" element={<TableOrder />} />
@@ -127,16 +133,20 @@ function App() {
   // Initialize bundle optimizations for instant table loading
   useEffect(() => {
     initializeBundleOptimizations();
+    // Sound alerts + service-worker message bridge (PLAY_ALERT / NAVIGATE)
+    soundManager.init();
   }, []);
 
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <CartProvider>
-        <DeliveryCartProvider>
-          <AppContent />
-        </DeliveryCartProvider>
-      </CartProvider>
-    </Router>
+    <AppErrorBoundary>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <CartProvider>
+          <DeliveryCartProvider>
+            <AppContent />
+          </DeliveryCartProvider>
+        </CartProvider>
+      </Router>
+    </AppErrorBoundary>
   );
 }
 

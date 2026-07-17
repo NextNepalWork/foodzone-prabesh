@@ -37,9 +37,9 @@ class StaffAuthService {
   handleAuthError() {
     console.warn('Staff authentication failed - clearing stored credentials');
     this.clearAuth();
-    // Optionally redirect to staff login page
-    if (window.location.pathname !== '/staff-login') {
-      window.location.href = '/staff-login';
+    // Redirect to the staff dashboard, which shows its own login form
+    if (window.location.pathname !== '/staff') {
+      window.location.href = '/staff';
     }
   }
 
@@ -86,7 +86,7 @@ class StaffAuthService {
   // Logout
   logout() {
     this.clearAuth();
-    window.location.href = '/staff-login';
+    window.location.href = '/staff';
   }
 
   // Check if user has specific role

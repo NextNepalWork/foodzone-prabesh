@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getApiUrl, getSocketUrl } from '../config/api';
 import io from 'socket.io-client';
 import settingsService from '../services/settingsService';
+import soundManager from '../utils/soundManager';
+import SoundEnableBanner from '../components/SoundEnableBanner';
 
 const StaffDashboard = () => {
   const [orders, setOrders] = useState([]);
@@ -298,37 +300,11 @@ const StaffDashboard = () => {
 
   const playNotificationSound = () => {
     try {
-      // Get notification settings
       const notificationSettings = settingsService.getNotificationSettings();
-      
       if (!notificationSettings.soundEnabled) {
         return;
       }
-
-      // Create a beep sound using Web Audio API as fallback
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.5);
-      
-      // Try to play audio file if available
-      const audio = new Audio('/sounds/notification.mp3');
-      // Use dynamic volume from settings (0-100 scale converted to 0-1)
-      audio.volume = notificationSettings.soundVolume / 100;
-      audio.play().catch(() => {
-        console.log('Audio file not available, using beep sound');
-      });
+      soundManager.play('new-order');
     } catch (error) {
       console.error('Error playing notification sound:', error);
     }
@@ -409,6 +385,7 @@ const StaffDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SoundEnableBanner />
       {/* Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {notifications.map((notification) => (

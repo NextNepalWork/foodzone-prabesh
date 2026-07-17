@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import io from 'socket.io-client';
-import audioManager from '../utils/audioNotifications';
+import soundManager from '../utils/soundManager';
 import { fetchApi, getSocketUrl } from '../services/apiService';
 import { getApiUrl } from '../config/api';
 import { useRestaurantInfo } from '../hooks/useSettings';
@@ -9,6 +9,7 @@ import { formatCurrency } from '../utils/currency';
 import settingsService from '../services/settingsService';
 
 import PaymentMethodModal from '../components/PaymentMethodModal';
+import PushNotificationManager from '../utils/pushNotifications';
 
 // Premium feature components
 import OrdersManagement from '../components/premium/OrdersManagement';
@@ -608,6 +609,7 @@ const AdminPremium = () => {
   const [toasts, setToasts] = useState([]);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [pendingOrderCompletion, setPendingOrderCompletion] = useState(null);
+  const [flaggedOrders, setFlaggedOrders] = useState([]);
 
   const pushToast = (message, tone = 'success') => {
     const id = Date.now() + Math.random();
@@ -640,7 +642,23 @@ const AdminPremium = () => {
 
           await Promise.allSettled([fetchOrders(), fetchCustomers(), fetchDatabaseSummary()]);
           if (cancelled) return;
-          audioManager.requestPermissions();
+          // Notification permission is handled by PushNotificationManager below
+
+          // Kitchen-alert PWA push: lets reception/management get a notification even if this tab isn't focused
+          try {
+            const pushManager = new PushNotificationManager();
+            if (pushManager.isSupported()) await pushManager.initialize('Manager');
+          } catch (e) {
+            console.warn('Admin PWA push init failed:', e);
+          }
+
+          // Populate the flagged-orders banner from current DB state (socket 'orderAlert' only covers new alerts)
+          try {
+            const flaggedRes = await fetchApi.get('/api/orders/flagged');
+            if (!cancelled) setFlaggedOrders(flaggedRes?.orders || []);
+          } catch (e) {
+            console.warn('Failed to fetch flagged orders:', e);
+          }
 
           if (cancelled) return;
           const newSocket = io(getSocketUrl(), {
@@ -670,17 +688,33 @@ const AdminPremium = () => {
             // events reach them live instead of waiting for the manual
             // refresh button. [live-admin]
             setRefreshTrigger((prev) => prev + 1);
-            if (order.order_type === 'delivery') audioManager.playDeliveryOrderSound();
-            else audioManager.playTableOrderSound();
+            if (order.order_type === 'delivery') soundManager.play('delivery-order', 'order-' + order.id);
+            else soundManager.play('table-order', 'order-' + order.id);
             pushToast(`New ${order.order_type || 'dine-in'} order received`, 'info');
           });
           newSocket.on('orderStatusUpdated', ({ orderId, status }) => {
-            setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+            // orderId arrives as a string off the socket; order ids are numeric — coerce both sides
+            setOrders((prev) => prev.map((o) => (String(o.id) === String(orderId) ? { ...o, status } : o)));
             setRefreshTrigger((prev) => prev + 1);
+            if (['ready', 'completed', 'cancelled'].includes(status)) {
+              setFlaggedOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
+            }
           });
           newSocket.on('tableCleared', ({ tableId }) => {
             setOrders((prev) => prev.filter((o) => o.table_id !== tableId));
             setRefreshTrigger((prev) => prev + 1);
+          });
+          newSocket.on('orderAlert', (alert) => {
+            setFlaggedOrders((prev) => [...prev.filter((o) => String(o.id) !== String(alert.orderId)), {
+              id: alert.orderId,
+              order_type: alert.orderType,
+              table_id: alert.tableId,
+              customer_name: alert.customerName,
+              created_at: alert.createdAt,
+              alertLevel: alert.alertLevel,
+            }]);
+            pushToast(alert.body, 'warning');
+            soundManager.play('kitchen-alarm', 'alert-' + alert.orderId);
           });
         } catch (e) {
           console.error('Auth verification failed:', e);
@@ -1140,6 +1174,8 @@ const AdminPremium = () => {
           loading={loading}
           socket={socket}
           restaurantInfo={restaurantInfo}
+          flaggedOrders={flaggedOrders}
+          onGotoOrders={() => setActiveTab('orders')}
         />
 
         <main className="flex-1 overflow-auto fz-scroll">
@@ -1371,7 +1407,7 @@ const PremiumSidebar = ({ activeTab, setActiveTab, collapsed, setCollapsed, onLo
 /* ============================================================
    Header — frosted glass
    ============================================================ */
-const PremiumHeader = ({ activeTab, orders, customers, onRefresh, socketConnected, loading, socket, restaurantInfo }) => {
+const PremiumHeader = ({ activeTab, orders, customers, onRefresh, socketConnected, loading, socket, restaurantInfo, flaggedOrders = [], onGotoOrders }) => {
   const { formatTimeWithWeekday, formatTime } = useDateTimeFormatter();
   const [now, setNow] = useState(new Date());
   const [incomingCalls, setIncomingCalls] = useState([]); // queue of pending incoming calls
@@ -1869,6 +1905,14 @@ const PremiumHeader = ({ activeTab, orders, customers, onRefresh, socketConnecte
       <audio ref={remoteAudioRef} autoPlay />
       
       <header className="glass-header sticky top-0 z-20">
+      {flaggedOrders.length > 0 && (
+        <button
+          onClick={onGotoOrders}
+          className="w-full flex items-center justify-center gap-2 h-8 bg-rose-600 hover:bg-rose-700 text-white text-[12px] font-semibold tracking-wide animate-pulse"
+        >
+          🚨 {flaggedOrders.length} kitchen order{flaggedOrders.length > 1 ? 's' : ''} delayed — {flaggedOrders.filter(o => o.alertLevel === 'preparing_30min' || o.alerted_30min).length > 0 ? 'some over 30 min' : 'over 15 min pending'}. Tap to review.
+        </button>
+      )}
       <div className="max-w-[1440px] mx-auto px-6 h-[52px] flex items-center justify-between gap-4">
         <div className="min-w-0 flex items-center gap-3">
           <h1 className="text-[14px] font-semibold text-slate-900 tracking-tight truncate capitalize">{activeTab}</h1>

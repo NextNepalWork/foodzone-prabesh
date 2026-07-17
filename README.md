@@ -1,72 +1,71 @@
-# Food Zone Restaurant - Ordering System (Foodzone.com.np)
+# Food Zone — Restaurant Management System
 
-A full-stack restaurant ordering system built with React (frontend) and Express.js (backend) featuring real-time order management and QR code table ordering.
+A production-ready, white-label restaurant platform: QR-code table ordering for customers, a counter-sale POS, kitchen displays, reception desk, daybook/cash management, reports & P&L, and a full admin console — with real-time updates, push notifications, and installable PWAs for every station.
 
-## Features
+**Stack:** React (CRA, Tailwind) · Express 4 · PostgreSQL · Socket.IO · web-push · nodemailer
 
-### Frontend (React)
-- **Homepage** (`/`) - Welcome page with restaurant information
-- **Menu** (`/menu`) - Browse menu items with cart functionality
-- **Table Ordering** (`/[tableId]`) - Table-specific ordering for tables 1-25
-- **Admin Panel** (`/admin`) - Real-time order management
-- **Sticky Table Banner** - Shows current table number for 1 hour
-- **Cart System** - Persistent cart tied to table sessions
-- **Custom Orders** - Free-write order box for custom items
-- **QR Code Support** - Direct links like `/1`, `/2`, etc. for QR codes
+## Surfaces
 
-### Backend (Express.js)
-- **RESTful API** endpoints for menu, orders, and table management
-- **Real-time updates** using Socket.IO
-- **Session management** with 1-hour TTL for table sessions
-- **In-memory storage** (easily replaceable with MongoDB)
+| Route | Who | What |
+|---|---|---|
+| `/` , `/menu`, `/:tableId` | Customers | Landing page, menu browsing, QR table ordering |
+| `/delivery-cart` | Customers | Delivery ordering |
+| `/pos` | Cashier / Manager | Counter-sale POS: item grid, cart, discounts, cash/card/QR payment with change calculation, receipt + KOT printing, daybook |
+| `/reception` | Cashier / Manager | Active orders, table map, payments, day close |
+| `/kitchen-tv` | Chef / Kitchen Helper | Live kitchen order board (touch screen) |
+| `/staff` | Chef / Waiter | Staff dashboard |
+| `/admin` | Manager | Orders, menu, inventory, reports & P&L, staff, settings (responsive: mobile admin on phones) |
 
-## API Endpoints
+Each staff surface is separately installable as a PWA — install the app **from the page you want it to open on** (e.g. install from `/pos` and the app always starts at the POS).
 
-- `GET /api/menu` - Fetch menu items
-- `POST /api/order` - Submit new order
-- `GET /api/orders` - Get all orders (admin)
-- `POST /api/clear-table/:tableId` - Clear table session (admin)
+## Quick start (local)
 
-## Quick Start
+```bash
+# 1. Database
+docker-compose up -d           # or any local PostgreSQL
+psql <your-db> -f create-all-tables.sql
 
-1. **Install all dependencies:**
-   ```bash
-   npm run install-all
-   ```
+# 2. Backend (port 3000)
+cd server
+cp .env.example .env           # set DATABASE_URL/DB_*, JWT_SECRET, INITIAL_MANAGER_PASSWORD
+npm install
+npm run dev
 
-2. **Start the development servers:**
-   ```bash
-   npm run dev
-   ```
+# 3. Frontend (port 3001; CRA proxy targets :3000)
+cd ../client
+npm install
+PORT=3001 npm start
+```
 
-This will start:
-- Backend server on http://localhost:5000
-- Frontend React app on http://localhost:3000
+Log in at `http://localhost:3001/admin` with the account seeded from `INITIAL_MANAGER_USERNAME` / `INITIAL_MANAGER_PASSWORD`.
 
-## Usage
+## Environment variables (server)
 
-### For Customers
-1. Scan QR code at your table (e.g., `/1` for table 1)
-2. Browse menu and add items to cart
-3. Add custom items if needed
-4. Provide name and phone number
-5. Submit order
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` (or `DB_HOST/PORT/NAME/USER/PASSWORD`) | ✅ prod | PostgreSQL connection |
+| `JWT_SECRET` | ✅ prod | Token signing — server refuses to boot in production without it |
+| `INITIAL_MANAGER_USERNAME` / `INITIAL_MANAGER_PASSWORD` | first boot | Seeds the first Manager account when the staff table is empty |
+| `ALLOWED_ORIGINS` | ✅ prod | Comma-separated browser origins (your restaurant's domain(s)) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | for push | Web-push notifications (`npx web-push generate-vapid-keys`) |
+| `SMTP_HOST/PORT/SECURE/USER/PASS`, `EMAIL_FROM` | for email | Order/booking email notifications (e.g. Hostinger SMTP) |
+| `PORT`, `NODE_ENV` | – | Defaults: `3000`, `development` |
 
-### For Staff
-1. Visit `/admin` to view incoming orders in real-time
-2. Clear tables when customers leave
-3. Monitor order queue and preparation status
+Client build-time: `REACT_APP_API_URL`, `REACT_APP_SOCKET_URL` → your backend URL.
 
-## Table URLs
-- Tables 1-25 are accessible via `/1`, `/2`, `/3`, etc.
-- Each table maintains its own cart session for 1 hour
-- QR codes should point to these direct URLs
+See [server/.env.example](server/.env.example) for the full annotated list, and [DEPLOYMENT.md](DEPLOYMENT.md) for the per-restaurant deployment runbook (Railway + Netlify/Vercel).
 
-## Technology Stack
-- **Frontend:** React, React Router, Tailwind CSS, Socket.IO Client
-- **Backend:** Express.js, Socket.IO, CORS
-- **Storage:** In-memory (configurable for MongoDB)
-- **Real-time:** Socket.IO for live order updates
+## ⚠️ Security note for existing deployments
 
-## Deployment Ready
-The application is configured for easy deployment with proper build scripts and environment configuration.
+Older revisions of this repository committed real credentials (`.env.production`, `server/.env.artisanweave`, `raw/server/.env`, `server/database/env*`). They have been removed from the tree, **but they remain in git history — rotate all of them**: the PostgreSQL password / `DATABASE_URL`, `JWT_SECRET`, admin & staff passwords, SMTP password, and VAPID keys.
+
+## White-label checklist (new restaurant)
+
+1. Deploy backend + PostgreSQL, set env vars (see DEPLOYMENT.md).
+2. Deploy frontend with `REACT_APP_API_URL` pointing at the backend; add the domain to `ALLOWED_ORIGINS`.
+3. Log in to `/admin` → **Settings**: business name, logo, colors, phone, address, currency, tax, operating hours.
+4. Upload payment QR codes (eSewa/Khalti/FonePay) in Settings → Integrations.
+5. Create staff accounts (Manager, Cashier, Chef, Waiter) in Admin → Staff.
+6. Import/enter the menu (Admin → Menu; CSV import script in `server/scripts/`).
+7. Print table QR codes (Settings → Tables) and place them on tables.
+8. On each station device, open its page and install the PWA (`/pos`, `/kitchen-tv`, `/reception`, `/admin`), then tap "Enable sound".

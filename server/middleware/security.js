@@ -17,6 +17,10 @@ const securityHeaders = helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // Disable for Socket.IO compatibility
+  // The frontend (Netlify/custom domain) embeds images served by this API
+  // (/uploads QR codes, menu photos) — helmet's default same-origin CORP
+  // blocks those cross-origin loads in the browser.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 });
 
 // Rate limiting configurations
@@ -107,35 +111,43 @@ const requestSizeLimit = (req, res, next) => {
   next();
 };
 
+// Allowed browser origins. White-label deployments set ALLOWED_ORIGINS
+// (comma-separated) instead of editing code. The defaults keep the original
+// Food Zone domains working.
+const getAllowedOrigins = () => {
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(',').map((url) => url.trim()).filter(Boolean);
+  }
+  return process.env.NODE_ENV === 'production'
+    ? [
+        'https://foodzone.com.np',
+        'https://www.foodzone.com.np',
+        'https://foodzoneduwakot.netlify.app'
+      ]
+    : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3005',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3005'
+      ];
+};
+
 // CORS security enhancement
 const enhancedCorsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = process.env.NODE_ENV === 'production' 
-      ? [
-          "https://foodzone.com.np", 
-          "https://www.foodzone.com.np", 
-          "https://foodzoneduwakot.netlify.app", 
-          "https://astounding-malabi-c1d59c.netlify.app", 
-          "https://food-zone-restaurant.windsurf.build", 
-          "https://foodzone-updated.windsurf.build", 
-          "https://main--astounding-malabi-c1d59c.netlify.app"
-        ]
-      : [
-          "http://localhost:3000", 
-          "http://localhost:3005",
-          "http://localhost:3001",
-          "http://127.0.0.1:3000", 
-          "http://127.0.0.1:3005",
-          "http://127.0.0.1:3001",
-          "http://192.168.1.73:3000",
-          "http://192.168.1.73:3001",
-          "http://192.168.1.73:3005"
-        ];
-
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
+
+    // Outside production, always allow local dev servers regardless of
+    // what ALLOWED_ORIGINS is set to.
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin);
+    if (process.env.NODE_ENV !== 'production' && isLocal) {
+      return callback(null, true);
+    }
+
+    if (getAllowedOrigins().includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS policy'));
@@ -153,5 +165,6 @@ module.exports = {
   rateLimits,
   checkAdminIP,
   requestSizeLimit,
-  enhancedCorsOptions
+  enhancedCorsOptions,
+  getAllowedOrigins
 };

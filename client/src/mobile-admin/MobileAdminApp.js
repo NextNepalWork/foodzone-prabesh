@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import { getSocketUrl } from '../config/api';
 import PushNotificationManager from '../utils/pushNotifications';
+import soundManager from '../utils/soundManager';
 
 import './mobile-admin.css';
 
@@ -141,6 +142,7 @@ const MobileAdminApp = () => {
     }
     socket.on('newOrder', (order) => {
       haptics.tap(20);
+      soundManager.play(order?.order_type === 'delivery' ? 'delivery-order' : 'table-order', order?.id ? `order-${order.id}` : undefined);
       setLiveOrders((prev) => [order, ...prev].slice(0, 50));
       setBadges((b) => ({ ...b, orders: (b.orders || 0) + 1 }));
     });

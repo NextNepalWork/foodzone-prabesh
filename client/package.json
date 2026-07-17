@@ -5,7 +5,7 @@
   "private": true,
   "proxy": "http://localhost:3000",
   "engines": {
-    "node": "24.x"
+    "node": ">=20 <25"
   },
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",

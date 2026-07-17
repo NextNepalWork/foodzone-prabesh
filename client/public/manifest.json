@@ -26,10 +26,17 @@
   "orientation": "portrait",
   "theme_color": "#2563eb",
   "background_color": "#ffffff",
-  "categories": ["food", "business", "productivity"],
+  "categories": [
+    "food",
+    "business",
+    "productivity"
+  ],
   "scope": "/",
   "prefer_related_applications": false,
-  "display_override": ["window-controls-overlay", "standalone"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
   "launch_handler": {
     "client_mode": "focus-existing"
   },
@@ -39,16 +46,39 @@
       "short_name": "Admin",
       "description": "Manage orders, tables and settings",
       "url": "/admin",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Staff Dashboard",
-      "short_name": "Kitchen",
+      "short_name": "Staff",
       "description": "View incoming orders",
       "url": "/staff",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Kitchen TV",
+      "short_name": "Kitchen TV",
+      "description": "Touch screen for the kitchen line",
+      "url": "/kitchen-tv",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "lang": "en",
-  "dir": "ltr"
+  "dir": "ltr",
+  "id": "/"
 }

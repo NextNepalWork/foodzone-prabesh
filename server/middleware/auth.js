@@ -1,11 +1,15 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
-// Use environment variables directly for Railway deployment
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
+// JWT_SECRET is mandatory in production. In development a random per-process
+// secret is generated (tokens won't survive restarts, which is fine for dev).
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: JWT_SECRET environment variable must be set in production.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(48).toString('hex');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD; // Fallback to plain password
 
 // Staff roles enum
 const STAFF_ROLES = {
@@ -115,35 +119,6 @@ const requireKitchenStaff = requireStaffRole([STAFF_ROLES.CHEF, STAFF_ROLES.KITC
 // Middleware for front-of-house staff (Manager + Waiter + Cashier)
 const requireFrontStaff = requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.WAITER, STAFF_ROLES.CASHIER]);
 
-// Staff user credentials from environment
-const STAFF_CREDENTIALS = {
-  manager: {
-    username: process.env.MANAGER_USERNAME || 'manager',
-    password: process.env.MANAGER_PASSWORD || 'Manager2024!',
-    role: STAFF_ROLES.MANAGER
-  },
-  chef: {
-    username: process.env.CHEF_USERNAME || 'chef',
-    password: process.env.CHEF_PASSWORD || 'Chef2024!',
-    role: STAFF_ROLES.CHEF
-  },
-  waiter: {
-    username: process.env.WAITER_USERNAME || 'waiter',
-    password: process.env.WAITER_PASSWORD || 'Waiter2024!',
-    role: STAFF_ROLES.WAITER
-  },
-  cashier: {
-    username: process.env.CASHIER_USERNAME || 'cashier',
-    password: process.env.CASHIER_PASSWORD || 'Cashier2024!',
-    role: STAFF_ROLES.CASHIER
-  },
-  kitchen_helper: {
-    username: process.env.KITCHEN_HELPER_USERNAME || 'kitchen_helper',
-    password: process.env.KITCHEN_HELPER_PASSWORD || 'KitchenHelper2024!',
-    role: STAFF_ROLES.KITCHEN_HELPER
-  }
-};
-
 // Admin authentication function - use database staff table
 const authenticateAdmin = async (username, password) => {
   try {
@@ -194,32 +169,20 @@ const authenticateAdmin = async (username, password) => {
 const authenticateStaff = async (username, password) => {
   try {
     const { query } = require('../database/config');
-    
-    console.log('Staff auth attempt:', { username, password: password ? '[PROVIDED]' : '[MISSING]' });
-    
+
     // Query staff from database
     const staffQuery = await query(
       'SELECT id, username, password_hash, full_name, role, is_active FROM staff WHERE username = $1 AND is_active = true',
       [username]
     );
-    
-    console.log('Staff query result:', staffQuery.rows.length > 0 ? 'Found user' : 'User not found');
-    
+
     if (staffQuery.rows.length === 0) {
       return { success: false, message: 'Invalid credentials' };
     }
-    
+
     const staff = staffQuery.rows[0];
-    console.log('Comparing password with hash:', { 
-      passwordLength: password.length, 
-      hashLength: staff.password_hash.length,
-      hashPrefix: staff.password_hash.substring(0, 10) 
-    });
-    
     const isValidPassword = await comparePassword(password, staff.password_hash);
-    
-    console.log('Password validation:', isValidPassword ? 'Valid' : 'Invalid');
-    
+
     if (!isValidPassword) {
       return { success: false, message: 'Invalid credentials' };
     }

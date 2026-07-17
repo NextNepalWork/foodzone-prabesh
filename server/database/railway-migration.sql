@@ -177,34 +177,9 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 
--- 13. Insert default staff users if not exists
--- Admin password: FoodZone2024!
-INSERT INTO staff (username, password_hash, full_name, role, is_active) 
-VALUES ('admin', '$2b$10$kBdrwDTQptt1D2jdHs/aWu/OSaXBIM47dj3.6CuTxRPEyqLci3r2.', 'Administrator', 'Manager', true)
-ON CONFLICT (username) DO UPDATE SET 
-    password_hash = EXCLUDED.password_hash,
-    role = 'Manager',
-    is_active = EXCLUDED.is_active;
-
--- Manager password: Manager2024!
-INSERT INTO staff (username, password_hash, full_name, role, is_active)
-VALUES ('manager', '$2b$10$feZXqZeabG/lHhTQPBSm.utZRaDP8KhYDR268y95kKjMuzU/BvtCi', 'Manager', 'Manager', true)
-ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
-
--- Chef password: Chef2024!
-INSERT INTO staff (username, password_hash, full_name, role, is_active)
-VALUES ('chef', '$2b$10$CmEBVSfGYPz0SQY3QykmhegmeRMbNlfzp.kNUnCICU2VhLB.cwq4G', 'Chef', 'Chef', true)
-ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
-
--- Waiter password: Waiter2024!
-INSERT INTO staff (username, password_hash, full_name, role, is_active)
-VALUES ('waiter', '$2b$10$Bj/0J4aPxOGt/YVPMTNCtesaTPR3h00IoyuO5qyS06ohPszCM.dnG', 'Waiter', 'Waiter', true)
-ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
-
--- Cashier password: Cashier2024!
-INSERT INTO staff (username, password_hash, full_name, role, is_active)
-VALUES ('cashier', '$2b$10$AgyiUYewemKhD2OXNK0CueYPlPeCJG.Qgo/8Qx4oXFUr7nAiM6H6y', 'Cashier', 'Cashier', true)
-ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+-- 13. Staff accounts are NOT seeded here. The first Manager account is
+-- created at server startup from INITIAL_MANAGER_USERNAME / INITIAL_MANAGER_PASSWORD
+-- when the staff table is empty; further accounts are created in Admin → Staff.
 
 -- 14. Ensure order_type consistency
 UPDATE orders SET order_type = 'dine-in' WHERE order_type = 'dine_in';

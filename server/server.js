@@ -1,3 +1,7 @@
+// Load environment variables before any module that reads process.env at
+// require time (utils/email.js, middleware/auth.js, database/config.js).
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -11,11 +15,8 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const webpush = require('web-push');
-const { sendEmail, smtpConfigured } = require('./utils/email');
-
-// Load environment variables first
-require('dotenv').config();
-const { 
+const { sendEmail, smtpConfigured, getEmailStatus } = require('./utils/email');
+const {
   authenticateToken, 
   requireAdmin, 
   requireStaffRole, 
@@ -25,13 +26,15 @@ const {
   requireCashier,
   requireKitchenStaff,
   requireFrontStaff,
-  authenticateAdmin, 
+  authenticateAdmin,
   authenticateStaff,
   generateToken,
-  STAFF_ROLES 
+  verifyToken,
+  hashPassword,
+  STAFF_ROLES
 } = require('./middleware/auth');
 const { validationRules, sanitizeInput } = require('./middleware/validation');
-const { securityHeaders, rateLimits, checkAdminIP, requestSizeLimit, enhancedCorsOptions } = require('./middleware/security');
+const { securityHeaders, rateLimits, checkAdminIP, requestSizeLimit, enhancedCorsOptions, getAllowedOrigins } = require('./middleware/security');
 const { globalErrorHandler, catchAsync, notFoundHandler, AppError, ValidationError, AuthenticationError, NotFoundError } = require('./middleware/errorHandler');
 const { Customer, Order, TableSession, TablePayment } = require('./database/models');
 const CacheManager = require('./utils/cacheManager');
@@ -51,9 +54,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production'
-      ? ["https://foodzone.com.np", "https://www.foodzone.com.np", "https://foodzoneduwakot.netlify.app", "https://astounding-malabi-c1d59c.netlify.app", "https://food-zone-restaurant.windsurf.build", "https://foodzone-updated.windsurf.build", "https://main--astounding-malabi-c1d59c.netlify.app"]
-      : (process.env.CORS_ORIGIN || "http://localhost:3000").split(',').map(url => url.trim()),
+    // Same origin allow-list as HTTP CORS — env-driven via ALLOWED_ORIGINS
+    origin: getAllowedOrigins(),
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -133,6 +135,96 @@ async function sendPushToAll(payload) {
   }
 }
 
+// Send a push notification only to subscriptions registered under the given roles (e.g. reception/admin alerts)
+async function sendPushToRoles(roles, payload) {
+  if (!pushEnabled) return;
+  try {
+    const { rows } = await query('SELECT * FROM push_subscriptions WHERE role = ANY($1)', [roles]);
+    const body = JSON.stringify(payload);
+    await Promise.all(rows.map(async (row) => {
+      const subscription = {
+        endpoint: row.endpoint,
+        keys: { p256dh: row.p256dh, auth: row.auth }
+      };
+      try {
+        await webpush.sendNotification(subscription, body);
+      } catch (error) {
+        if (error.statusCode === 404 || error.statusCode === 410) {
+          await query('DELETE FROM push_subscriptions WHERE endpoint = $1', [row.endpoint]).catch(() => {});
+        } else {
+          console.warn('⚠️ Push send failed for a subscription:', error.message);
+        }
+      }
+    }));
+  } catch (error) {
+    console.error('❌ Error sending role-targeted push notifications:', error.message);
+  }
+}
+
+// Alert roles that should be notified when kitchen orders stall (reception/management)
+const KITCHEN_ALERT_ROLES = [STAFF_ROLES.MANAGER, STAFF_ROLES.CASHIER];
+
+// Every minute: flag orders stuck in 'pending' 15+ min, and orders still 'preparing' 30+ min after being placed.
+// Each order is only alerted once per threshold (alerted_15min / alerted_30min flags), and only recent orders
+// are considered so a long-stale order doesn't re-trigger noise after a server restart.
+async function checkOrderAlerts() {
+  try {
+    const pendingStale = await query(`
+      UPDATE orders SET alerted_15min = true
+      WHERE status = 'pending'
+        AND alerted_15min = false
+        AND created_at <= NOW() - INTERVAL '15 minutes'
+        AND created_at >= NOW() - INTERVAL '3 hours'
+      RETURNING id, order_type, table_id, customer_name, created_at
+    `);
+
+    for (const order of pendingStale.rows) {
+      const alert = {
+        type: 'ORDER_ALERT',
+        alertLevel: 'pending_15min',
+        orderId: order.id,
+        orderType: order.order_type,
+        tableId: order.table_id,
+        customerName: order.customer_name,
+        createdAt: order.created_at,
+        title: '⏰ Order stuck in Pending',
+        body: `Order #${order.id} has been waiting 15+ minutes without being started.`
+      };
+      io.emit('orderAlert', alert);
+      await sendPushToRoles(KITCHEN_ALERT_ROLES, alert);
+    }
+
+    const preparingStale = await query(`
+      UPDATE orders SET alerted_30min = true
+      WHERE status = 'preparing'
+        AND alerted_30min = false
+        AND created_at <= NOW() - INTERVAL '30 minutes'
+        AND created_at >= NOW() - INTERVAL '3 hours'
+      RETURNING id, order_type, table_id, customer_name, created_at
+    `);
+
+    for (const order of preparingStale.rows) {
+      const alert = {
+        type: 'ORDER_ALERT',
+        alertLevel: 'preparing_30min',
+        orderId: order.id,
+        orderType: order.order_type,
+        tableId: order.table_id,
+        customerName: order.customer_name,
+        createdAt: order.created_at,
+        title: '🚨 Order overdue',
+        body: `Order #${order.id} was placed 30+ minutes ago and is still preparing.`
+      };
+      io.emit('orderAlert', alert);
+      await sendPushToRoles(KITCHEN_ALERT_ROLES, alert);
+    }
+  } catch (error) {
+    console.error('❌ Error checking order alerts:', error.message);
+  }
+}
+
+setInterval(checkOrderAlerts, 60 * 1000);
+
 // Apply security middleware first
 app.use(securityHeaders);
 app.use(requestSizeLimit);
@@ -150,175 +242,6 @@ app.get('/health', (req, res) => {
     version: '1.0.0',
     port: process.env.PORT || 3000
   });
-});
-
-// Debug endpoint to check daybook table structure
-app.get('/debug/daybook-columns', async (req, res) => {
-  try {
-    const result = await query(`
-      SELECT column_name, data_type, is_nullable
-      FROM information_schema.columns
-      WHERE table_name = 'daybook_transactions'
-      ORDER BY ordinal_position
-    `);
-    res.json({ columns: result.rows });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Debug endpoint to check order history date range
-app.get('/debug/order-date-range', async (req, res) => {
-  try {
-    const result = await query(`
-      SELECT 
-        MIN(created_at) as earliest_order,
-        MAX(created_at) as latest_order,
-        COUNT(*) as total_orders,
-        COUNT(DISTINCT DATE(created_at)) as days_with_orders
-      FROM orders
-    `);
-    
-    const byMonth = await query(`
-      SELECT 
-        TO_CHAR(created_at, 'YYYY-MM') as month,
-        COUNT(*) as order_count
-      FROM orders
-      GROUP BY TO_CHAR(created_at, 'YYYY-MM')
-      ORDER BY month DESC
-    `);
-    
-    const byDay = await query(`
-      SELECT 
-        DATE(created_at) as order_date,
-        COUNT(*) as order_count
-      FROM orders
-      GROUP BY DATE(created_at)
-      ORDER BY order_date DESC
-      LIMIT 20
-    `);
-    
-    res.json({ 
-      dateRange: result.rows[0],
-      ordersByMonth: byMonth.rows,
-      recentDays: byDay.rows
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Debug endpoint to check operations metrics
-app.get('/debug/operations-metrics', async (req, res) => {
-  try {
-    // First check what columns exist in orders table
-    const columns = await query(`
-      SELECT column_name, data_type
-      FROM information_schema.columns
-      WHERE table_name = 'orders'
-      ORDER BY ordinal_position
-    `);
-    
-    // Check customer data in orders
-    const customerData = await query(`
-      SELECT 
-        COUNT(*) as total_orders,
-        COUNT(customer_id) as orders_with_customer_id,
-        COUNT(customer_name) as orders_with_customer_name,
-        COUNT(customer_phone) as orders_with_customer_phone
-      FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-    `);
-    
-    // Sample customer data
-    const sampleCustomers = await query(`
-      SELECT 
-        customer_id,
-        customer_name,
-        customer_phone,
-        COUNT(*) as order_count,
-        SUM(total) as total_spend
-      FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-        AND (customer_id IS NOT NULL OR customer_name IS NOT NULL OR customer_phone IS NOT NULL)
-      GROUP BY customer_id, customer_name, customer_phone
-      ORDER BY total_spend DESC
-      LIMIT 5
-    `);
-    
-    // Check table performance
-    const tablePerf = await query(`
-      SELECT 
-        table_id,
-        COUNT(*) as order_count,
-        SUM(total) as revenue,
-        AVG(total) as avg_order_value
-      FROM orders
-      WHERE table_id IS NOT NULL
-        AND order_type = 'dine-in'
-        AND created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY table_id
-      ORDER BY revenue DESC
-      LIMIT 10
-    `);
-    
-    // Check discounts
-    const discounts = await query(`
-      SELECT 
-        COUNT(*) FILTER (WHERE COALESCE(discount, 0) > 0) as discounted_orders,
-        COALESCE(SUM(discount), 0) as total_discount
-      FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-    `);
-    
-    // Check delivery orders
-    const delivery = await query(`
-      SELECT 
-        COUNT(*) as total_orders,
-        COUNT(CASE WHEN order_type = 'delivery' THEN 1 END) as delivery_count,
-        COALESCE(SUM(CASE WHEN order_type = 'delivery' THEN delivery_fee ELSE 0 END), 0) as total_delivery_fees
-      FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-    `);
-    
-    // Check heatmap data
-    const heatmap = await query(`
-      SELECT 
-        EXTRACT(DOW FROM created_at) as day_of_week,
-        EXTRACT(HOUR FROM created_at) as hour,
-        COUNT(*) as order_count
-      FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY day_of_week, hour
-      ORDER BY order_count DESC
-      LIMIT 10
-    `);
-    
-    // Check staff activity (daybook transactions)
-    const staffActivity = await query(`
-      SELECT 
-        created_by,
-        COUNT(*) as transaction_count
-      FROM daybook_transactions
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-        AND created_by IS NOT NULL
-      GROUP BY created_by
-      ORDER BY transaction_count DESC
-    `);
-    
-    res.json({ 
-      orderColumns: columns.rows,
-      customerData: customerData.rows[0],
-      sampleCustomers: sampleCustomers.rows,
-      tablePerformance: tablePerf.rows,
-      discounts: discounts.rows[0],
-      delivery: delivery.rows[0],
-      heatmapSample: heatmap.rows,
-      staffActivity: staffActivity.rows
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message, stack: error.stack });
-  }
 });
 
 // Apply general rate limiting
@@ -530,6 +453,10 @@ async function loadSettings() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Kitchen alert tracking — flags so the 15/30-min alerts fire once per order, not every cron tick
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS alerted_15min BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS alerted_30min BOOLEAN DEFAULT false`);
 
     const result = await query('SELECT setting_key, setting_value FROM restaurant_settings');
     result.rows.forEach(row => {
@@ -841,7 +768,7 @@ loadSettings();
 // API Routes
 
 // Clear table sessions endpoint for cache cleanup
-app.post('/api/clear-table-sessions', (req, res) => {
+app.post('/api/clear-table-sessions', authenticateToken, requireAdmin, (req, res) => {
   try {
     const clearedSessions = tableSessions.size;
     tableSessions.clear();
@@ -886,7 +813,7 @@ app.get('/api/cache/stats', (req, res) => {
 });
 
 // Force cache cleanup endpoint
-app.post('/api/cache/force-cleanup', (req, res) => {
+app.post('/api/cache/force-cleanup', authenticateToken, requireAdmin, (req, res) => {
   try {
     let cleaned = 0;
     if (cacheManager) {
@@ -1076,52 +1003,66 @@ app.patch('/api/menu/:id/toggle', async (req, res) => {
 
 app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (req, res) => {
   try {
-    const { tableId, customerName, phone, address, deliveryNotes, coordinates, items, orderType, totalAmount, deliveryFee = 0 } = req.body;
-    
+    const { tableId, customerName, phone, address, deliveryNotes, coordinates, items, orderType, totalAmount, deliveryFee = 0, discount = 0, source } = req.body;
+
+    // Staff-placed orders (POS / reception) carry a Bearer token. Staff can
+    // order outside opening hours and below the minimum order amount, and may
+    // apply a discount. The token is optional — customer orders have none.
+    let staffUser = null;
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        staffUser = verifyToken(authHeader.split(' ')[1]);
+      } catch (e) {
+        staffUser = null;
+      }
+    }
+    const isStaffOrder = !!staffUser;
+
     const isDelivery = tableId === 'Delivery' || orderType === 'delivery';
-    const finalTableId = !isDelivery && tableId ? tableId : null;
-    
+    const isTakeaway = !isDelivery && orderType === 'takeaway';
+    const finalTableId = !isDelivery && !isTakeaway && tableId ? tableId : null;
+
     // Use NULL for optional fields if not provided
     const finalCustomerName = customerName && customerName.trim() ? customerName.trim() : null;
     const finalPhone = phone && phone.trim() ? phone.trim() : null;
-    
-    console.log('🔍 Order submission debug:', { 
-      tableId, 
-      tableIdType: typeof tableId,
-      orderType, 
-      isDelivery,
-      finalTableId,
-      finalTableIdType: typeof finalTableId,
-      customerName: finalCustomerName,
-      phone: finalPhone
-    });
-    
+
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Order must contain at least one item' });
     }
 
-    // Check if restaurant is open for orders
-    const hoursCheck = await orderingHoursValidator.isOpenForOrders();
-    if (!hoursCheck.open) {
-      const allowPreOrders = await orderingHoursValidator.allowPreOrders();
-      if (!allowPreOrders) {
-        return res.status(400).json({ error: hoursCheck.reason });
+    // Check if restaurant is open for orders (staff can always order)
+    if (!isStaffOrder) {
+      const hoursCheck = await orderingHoursValidator.isOpenForOrders();
+      if (!hoursCheck.open) {
+        const allowPreOrders = await orderingHoursValidator.allowPreOrders();
+        if (!allowPreOrders) {
+          return res.status(400).json({ error: hoursCheck.reason });
+        }
+        console.log('⏰ Pre-order accepted (restaurant closed):', hoursCheck.reason);
       }
-      console.log('⏰ Pre-order accepted (restaurant closed):', hoursCheck.reason);
     }
 
     // Calculate order details
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const total = subtotal + deliveryFee;
 
-    // Validate minimum order amount from settings
-    const minOrderKey = isDelivery ? 'ordering.min_order_delivery' : 'ordering.min_order_dinein';
-    const minOrder = await settingsLoader.get(minOrderKey, isDelivery ? 200 : 0);
-    
-    if (subtotal < minOrder) {
-      return res.status(400).json({ 
-        error: `Minimum order amount is Rs. ${minOrder}. Your order is Rs. ${subtotal}` 
-      });
+    // Discounts are staff-only, must not exceed the order value
+    let finalDiscount = 0;
+    if (isStaffOrder && typeof discount === 'number' && discount > 0) {
+      finalDiscount = Math.min(discount, subtotal + deliveryFee);
+    }
+    const total = subtotal + deliveryFee - finalDiscount;
+
+    // Validate minimum order amount from settings (staff orders exempt)
+    if (!isStaffOrder) {
+      const minOrderKey = isDelivery ? 'ordering.min_order_delivery' : 'ordering.min_order_dinein';
+      const minOrder = await settingsLoader.get(minOrderKey, isDelivery ? 200 : 0);
+
+      if (subtotal < minOrder) {
+        return res.status(400).json({
+          error: `Minimum order amount is Rs. ${minOrder}. Your order is Rs. ${subtotal}`
+        });
+      }
     }
 
     // Find or create customer (only if phone is provided)
@@ -1143,7 +1084,7 @@ app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (re
 
     // Create order data
     const orderData = {
-      orderType: isDelivery ? 'delivery' : 'dine-in',
+      orderType: isDelivery ? 'delivery' : (isTakeaway ? 'takeaway' : 'dine-in'),
       customerId: customer ? customer.id : null,
       customerName: finalCustomerName,
       customerPhone: finalPhone || null,
@@ -1155,7 +1096,7 @@ app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (re
       deliveryFee: isDelivery ? deliveryFee : 0,
       tableId: finalTableId,
       subtotal,
-      discount: 0,
+      discount: finalDiscount,
       total,
       paymentMethod: 'cash',
       notes: deliveryNotes,
@@ -1176,12 +1117,13 @@ app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (re
     // Send push notification (works even when app is closed / screen locked)
     const orderLabel = order.table_id ? `Table ${order.table_id}` : (order.order_type === 'delivery' ? 'Delivery' : 'Takeaway');
     sendPushToAll({
-      title: '🍽️ Food Zone - New Order!',
+      title: '🍽️ New Order!',
       body: `${orderLabel} - NPR ${order.total_amount || order.total || 0}`,
       orderType: 'NEW_ORDER',
       orderId: order.id,
       tableId: order.table_id,
-      totalAmount: order.total_amount || order.total || 0
+      totalAmount: order.total_amount || order.total || 0,
+      url: `/reception?order=${order.id}`
     });
     sendOrderEmailNotification(order);
 
@@ -1378,7 +1320,25 @@ app.get('/api/orders/table/:tableId', async (req, res) => {
 });
 
 
-app.get('/api/orders', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CHEF, STAFF_ROLES.WAITER, STAFF_ROLES.CASHIER]), async (req, res) => {
+// Orders currently flagged by the kitchen alert cron (stuck pending 15+ min or overdue preparing 30+ min),
+// so reception/admin can populate their banner on page load rather than only via the live socket event.
+app.get('/api/orders/flagged', authenticateToken, requireFrontStaff, async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT id, order_type, table_id, customer_name, status, created_at, alerted_15min, alerted_30min
+      FROM orders
+      WHERE (alerted_15min = true OR alerted_30min = true)
+        AND status NOT IN ('ready', 'completed', 'cancelled')
+      ORDER BY created_at ASC
+    `);
+    res.json({ orders: result.rows });
+  } catch (error) {
+    console.error('❌ Error fetching flagged orders:', error);
+    res.status(500).json({ error: 'Failed to fetch flagged orders' });
+  }
+});
+
+app.get('/api/orders', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CHEF, STAFF_ROLES.WAITER, STAFF_ROLES.CASHIER, STAFF_ROLES.KITCHEN_HELPER]), async (req, res) => {
   try {
     const { 
       status, 
@@ -1573,7 +1533,7 @@ app.get('/api/database/summary', async (req, res) => {
   }
 });
 
-app.post('/api/database/clear-all', async (req, res) => {
+app.post('/api/database/clear-all', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('🧹 Database cleanup requested via API');
     
@@ -1852,7 +1812,7 @@ app.post('/api/analytics/email-report', authenticateToken, requireAdmin, async (
 });
 
 // Update order status endpoint
-app.put('/api/orders/:orderId/status', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CHEF, STAFF_ROLES.WAITER, STAFF_ROLES.CASHIER]), validationRules.updateOrderStatus, async (req, res) => {
+app.put('/api/orders/:orderId/status', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CHEF, STAFF_ROLES.WAITER, STAFF_ROLES.CASHIER, STAFF_ROLES.KITCHEN_HELPER]), validationRules.updateOrderStatus, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status, payment_status, payment_method } = req.body;
@@ -2092,7 +2052,7 @@ app.post('/api/settings/happy-hour', async (req, res) => {
   }
 });
 
-app.post('/api/clear-table/:tableId', async (req, res) => {
+app.post('/api/clear-table/:tableId', authenticateToken, requireFrontStaff, async (req, res) => {
   console.log('🔧 Clear table API called for tableId:', req.params.tableId);
   try {
     const { tableId } = req.params;
@@ -2165,58 +2125,54 @@ app.post('/api/clear-table/:tableId', async (req, res) => {
   }
 });
 
-// Migrate table - move all orders from one table to another
-app.post('/api/migrate-table', async (req, res) => {
-  console.log('🔄 Migrate table API called:', req.body);
+// Migrate table - move all active orders from one table to another (staff only)
+app.post('/api/migrate-table', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { fromTableId, toTableId } = req.body;
-    
+
     if (!fromTableId || !toTableId) {
       return res.status(400).json({ success: false, message: 'Both fromTableId and toTableId are required' });
     }
-    
+
     const fromTableInt = parseInt(fromTableId);
     const toTableInt = parseInt(toTableId);
-    
+
     if (fromTableInt === toTableInt) {
       return res.status(400).json({ success: false, message: 'Cannot migrate to the same table' });
     }
-    
+
     if (fromTableInt < 1 || fromTableInt > restaurantSettings.tableCount || toTableInt < 1 || toTableInt > restaurantSettings.tableCount) {
       return res.status(400).json({ success: false, message: `Table numbers must be between 1 and ${restaurantSettings.tableCount}` });
     }
-    
-    console.log(`🔄 Migrating orders from Table ${fromTableInt} to Table ${toTableInt}`);
-    
+
     // Update all active orders from the source table to the target table
     const result = await query(`
-      UPDATE orders 
+      UPDATE orders
       SET table_id = $1
-      WHERE table_id = $2 
+      WHERE table_id = $2
       AND order_type IN ('dine-in', 'dine_in')
       AND status IN ('pending', 'preparing', 'ready')
       RETURNING id, order_number
     `, [toTableInt, fromTableInt]);
-    
+
     const ordersUpdated = result.rowCount;
-    console.log(`✅ Migrated ${ordersUpdated} orders from Table ${fromTableInt} to Table ${toTableInt}`);
-    
+
     // Clear source table session
     tableSessions.delete(String(fromTableInt));
     tableSessions.delete(fromTableInt);
-    
+
     // Emit table migration event
     io.emit('tableMigrated', { fromTableId: fromTableInt, toTableId: toTableInt, ordersUpdated });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Successfully migrated ${ordersUpdated} orders from Table ${fromTableInt} to Table ${toTableInt}`,
       ordersUpdated,
       fromTableId: fromTableInt,
       toTableId: toTableInt
     });
   } catch (error) {
-    console.error('❌ Error migrating table:', error);
+    console.error('Error migrating table:', error);
     res.status(500).json({ success: false, error: 'Failed to migrate table', details: error.message });
   }
 });
@@ -2515,296 +2471,6 @@ app.post('/api/admin/staff/:id/reset-password', authenticateToken, requireAdmin,
       success: false, 
       message: 'Failed to reset password',
       error: error.message 
-    });
-  }
-});
-
-// Database connection test endpoint
-app.get('/api/test/db', async (req, res) => {
-  try {
-    const result = await query('SELECT NOW() as current_time, version() as db_version');
-    res.json({ 
-      success: true, 
-      connected: true,
-      timestamp: result.rows[0].current_time,
-      version: result.rows[0].db_version
-    });
-  } catch (error) {
-    console.error('❌ Database connection test failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      connected: false,
-      error: error.message 
-    });
-  }
-});
-
-// Check database tables endpoint
-app.get('/api/test/tables', async (req, res) => {
-  try {
-    const tables = await query(`
-      SELECT table_name, table_schema 
-      FROM information_schema.tables 
-      WHERE table_type = 'BASE TABLE'
-      ORDER BY table_schema, table_name
-    `);
-    
-    const publicTables = await query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-    `);
-    
-    res.json({
-      success: true,
-      allTables: tables.rows,
-      publicTables: publicTables.rows.map(r => r.table_name),
-      count: publicTables.rows.length
-    });
-  } catch (error) {
-    console.error('❌ Table check failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
-// Clear and repopulate menu data endpoint (no auth required for development)
-app.post('/api/menu/reset', async (req, res) => {
-  try {
-    console.log('🔄 Clearing existing menu data and repopulating...');
-    
-    // Clear existing menu data only
-    await query('DELETE FROM menu_items');
-    
-    // New menu data based on provided list
-    const menuItems = [
-      // Combo Meals
-      {name: 'Veg Combo', price: 599, category: 'Combo Meals', description: 'Veg Burger, Tofu Stick, Cheese Fries, Cheese Corndog + Free Coke/Bubble Tea'},
-      {name: 'Non-Veg Combo', price: 599, category: 'Combo Meals', description: 'Chicken Burger, Chicken Sausage, Cheese Fries, Corndog + Free Coke/Bubble Tea'},
-      
-      // Nanglo Khaja Set
-      {name: 'Non-Veg Nanglo Khaja Set', price: 1999, category: 'Nanglo Khaja Set', description: 'Chicken Biryani, Chicken Momo, Chicken Sausage, Veg Chowmein, Mustang Aalu, Wai Wai Sadeko, Hot Wings, Drumstick, Chicken Burger, Chicken Pizza + 250ml Coke Free'},
-      {name: 'Veg Nanglo Khaja Set', price: 1499, category: 'Nanglo Khaja Set', description: 'Veg Biryani, Veg Momo, Tofu Stick, Mustang Aalu, Veg Burger, Cheese Pizza, Paneer Pakoda, Wai Wai Sadeko, Potato Cheese Ball + 250ml Coke Free'},
-      
-      // Khaja & Khana Sets
-      {name: 'Veg Khaja Set', price: 250, category: 'Khaja & Khana Sets'},
-      {name: 'Non-Veg Khaja Set', price: 300, category: 'Khaja & Khana Sets'},
-      {name: 'Veg Khana Set', price: 250, category: 'Khaja & Khana Sets'},
-      {name: 'Non-Veg Khana Set', price: 300, category: 'Khaja & Khana Sets'},
-      {name: 'Food Zone Special', price: 400, category: 'Khaja & Khana Sets'},
-      
-      // Breakfast
-      {name: 'Bread Omelette', price: 150, category: 'Breakfast'},
-      {name: 'Bread Jam', price: 100, category: 'Breakfast'},
-      {name: 'French Toast', price: 150, category: 'Breakfast'},
-      {name: 'Butter Toast', price: 100, category: 'Breakfast'},
-      {name: 'Honey Butter Toast', price: 150, category: 'Breakfast'},
-      {name: 'Cheese Toast', price: 150, category: 'Breakfast'},
-      {name: 'Cheese Tomato Toast', price: 180, category: 'Breakfast'},
-      {name: 'Aalu Paratha', price: 140, category: 'Breakfast', description: 'With Dahi & Mix Pickle'},
-      {name: 'Pancake', price: 150, category: 'Breakfast'},
-      {name: 'Bread Roll', price: 150, category: 'Breakfast'},
-      {name: 'Regular Breakfast', price: 250, category: 'Breakfast', description: 'Veg/Chicken Sandwich, Masala Tea, Omelette'},
-      {name: 'Food Zone Special Breakfast', price: 350, category: 'Breakfast', description: 'Cheese Tomato Toast, Omelette, Salad, Milk Masala Tea, Hash Brown Potatoes'},
-      
-      // Sandwiches & Burgers
-      {name: 'Veg Sandwich', price: 180, category: 'Sandwiches & Burgers'},
-      {name: 'Egg Sandwich', price: 180, category: 'Sandwiches & Burgers'},
-      {name: 'Chicken Sandwich', price: 180, category: 'Sandwiches & Burgers'},
-      {name: 'Veg Cheese Sandwich', price: 250, category: 'Sandwiches & Burgers'},
-      {name: 'Chicken Cheese Sandwich', price: 250, category: 'Sandwiches & Burgers'},
-      {name: 'Club Sandwich', price: 300, category: 'Sandwiches & Burgers'},
-      {name: 'Veg Burger', price: 180, category: 'Sandwiches & Burgers'},
-      {name: 'Chicken Burger', price: 180, category: 'Sandwiches & Burgers'},
-      {name: 'Veg Cheese Burger', price: 250, category: 'Sandwiches & Burgers'},
-      {name: 'Chicken Cheese Burger', price: 250, category: 'Sandwiches & Burgers'},
-      
-      // Fries
-      {name: 'French Fries', price: 160, category: 'Fries'},
-      {name: 'Fries Chilly', price: 220, category: 'Fries'},
-      
-      // MoMo
-      {name: 'Veg MoMo (Steam)', price: 120, category: 'MoMo'},
-      {name: 'Veg MoMo (Fried)', price: 170, category: 'MoMo'},
-      {name: 'Veg MoMo (Jhol)', price: 170, category: 'MoMo'},
-      {name: 'Veg MoMo (Chilly)', price: 200, category: 'MoMo'},
-      {name: 'Veg MoMo (Sadeko)', price: 200, category: 'MoMo'},
-      {name: 'Veg MoMo (Kothey)', price: 200, category: 'MoMo'},
-      {name: 'Buff MoMo (Steam)', price: 120, category: 'MoMo'},
-      {name: 'Buff MoMo (Fried)', price: 170, category: 'MoMo'},
-      {name: 'Buff MoMo (Jhol)', price: 170, category: 'MoMo'},
-      {name: 'Buff MoMo (Chilly)', price: 200, category: 'MoMo'},
-      {name: 'Buff MoMo (Sadeko)', price: 200, category: 'MoMo'},
-      {name: 'Buff MoMo (Kothey)', price: 200, category: 'MoMo'},
-      {name: 'Chicken MoMo (Steam)', price: 140, category: 'MoMo'},
-      {name: 'Chicken MoMo (Fried)', price: 190, category: 'MoMo'},
-      {name: 'Chicken MoMo (Jhol)', price: 190, category: 'MoMo'},
-      {name: 'Chicken MoMo (Chilly)', price: 220, category: 'MoMo'},
-      {name: 'Chicken MoMo (Sadeko)', price: 220, category: 'MoMo'},
-      {name: 'Chicken MoMo (Kothey)', price: 220, category: 'MoMo'},
-      
-      // Chowmein
-      {name: 'Veg Chowmein (Half)', price: 70, category: 'Chowmein'},
-      {name: 'Veg Chowmein (Full)', price: 110, category: 'Chowmein'},
-      {name: 'Buff Chowmein (Half)', price: 90, category: 'Chowmein'},
-      {name: 'Buff Chowmein (Full)', price: 150, category: 'Chowmein'},
-      {name: 'Chicken Chowmein (Half)', price: 90, category: 'Chowmein'},
-      {name: 'Chicken Chowmein (Full)', price: 150, category: 'Chowmein'},
-      {name: 'Egg Chowmein (Half)', price: 90, category: 'Chowmein'},
-      {name: 'Egg Chowmein (Full)', price: 150, category: 'Chowmein'},
-      {name: 'Mix Chowmein', price: 200, category: 'Chowmein'},
-      
-      // Corn Dog & Hot Dog
-      {name: 'Sausage Corn Dog', price: 130, category: 'Corn Dog & Hot Dog'},
-      {name: 'Cheese Corn Dog', price: 180, category: 'Corn Dog & Hot Dog'},
-      {name: 'Hot Dog (Chicken)', price: 190, category: 'Corn Dog & Hot Dog'},
-      
-      // Thukpa
-      {name: 'Veg Thukpa (Half)', price: 100, category: 'Thukpa'},
-      {name: 'Veg Thukpa (Full)', price: 150, category: 'Thukpa'},
-      {name: 'Egg Thukpa (Half)', price: 140, category: 'Thukpa'},
-      {name: 'Egg Thukpa (Full)', price: 180, category: 'Thukpa'},
-      {name: 'Chicken Thukpa (Half)', price: 140, category: 'Thukpa'},
-      {name: 'Chicken Thukpa (Full)', price: 180, category: 'Thukpa'},
-      {name: 'Mixed Thukpa', price: 200, category: 'Thukpa'},
-      
-      // Pizza
-      {name: '9 Inch Cheese Pizza', price: 400, category: 'Pizza'},
-      {name: '12 Inch Cheese Pizza', price: 400, category: 'Pizza'},
-      {name: '9 Inch Veg Pizza', price: 450, category: 'Pizza'},
-      {name: '12 Inch Veg Pizza', price: 450, category: 'Pizza'},
-      {name: '9 Inch Chicken Pizza', price: 450, category: 'Pizza'},
-      {name: '12 Inch Chicken Pizza', price: 450, category: 'Pizza'},
-      {name: '9 Inch Mixed Pizza', price: 500, category: 'Pizza'},
-      {name: '12 Inch Mixed Pizza', price: 500, category: 'Pizza'},
-      {name: 'Extra Cheese', price: 100, category: 'Pizza'},
-      
-      // Rice & Biryani
-      {name: 'Veg Fry Rice (Half)', price: 100, category: 'Rice & Biryani'},
-      {name: 'Veg Fry Rice (Full)', price: 150, category: 'Rice & Biryani'},
-      {name: 'Egg Fry Rice (Half)', price: 120, category: 'Rice & Biryani'},
-      {name: 'Egg Fry Rice (Full)', price: 160, category: 'Rice & Biryani'},
-      {name: 'Buff Fry Rice (Half)', price: 120, category: 'Rice & Biryani'},
-      {name: 'Buff Fry Rice (Full)', price: 180, category: 'Rice & Biryani'},
-      {name: 'Chicken Fry Rice (Half)', price: 120, category: 'Rice & Biryani'},
-      {name: 'Chicken Fry Rice (Full)', price: 180, category: 'Rice & Biryani'},
-      {name: 'Mixed Fry Rice', price: 200, category: 'Rice & Biryani'},
-      {name: 'Veg Biryani', price: 280, category: 'Rice & Biryani'},
-      {name: 'Chicken Biryani', price: 320, category: 'Rice & Biryani'},
-      {name: 'Egg Biryani', price: 300, category: 'Rice & Biryani'},
-      
-      // Curries
-      {name: 'Aalu Matar', price: 130, category: 'Curries'},
-      {name: 'Mix Veg', price: 130, category: 'Curries'},
-      {name: 'Mushroom Curry', price: 180, category: 'Curries'},
-      {name: 'Matar Paneer', price: 250, category: 'Curries'},
-      {name: 'Paneer Butter Masala', price: 300, category: 'Curries'},
-      {name: 'Chicken Curry', price: 180, category: 'Curries'},
-      {name: 'Chicken Butter Masala', price: 250, category: 'Curries'},
-      {name: 'Chicken Curry Rice', price: 250, category: 'Curries'},
-      {name: 'Paneer Curry Rice', price: 300, category: 'Curries'},
-      {name: 'Veg Curry Rice', price: 200, category: 'Curries'},
-      
-      // Peri Peri & Chicken Specials
-      {name: 'Peri Peri Chicken', price: 350, category: 'Peri Peri & Chicken Specials'},
-      {name: 'Chicken 65', price: 300, category: 'Peri Peri & Chicken Specials'},
-      {name: 'Chicken Popcorn', price: 250, category: 'Peri Peri & Chicken Specials'},
-      {name: 'Food Zone Special Dragon Chicken', price: 300, category: 'Peri Peri & Chicken Specials'},
-      
-      // Fish Specials
-      {name: 'Fish Finger (8 pcs)', price: 250, category: 'Fish Specials'},
-      {name: 'Fish & Chips', price: 350, category: 'Fish Specials'},
-      
-      // Paneer & Veg Snacks
-      {name: 'Paneer Pakoda', price: 300, category: 'Paneer & Veg Snacks'},
-      {name: 'Paneer Chilly', price: 300, category: 'Paneer & Veg Snacks'},
-      {name: 'Grill Potatoes', price: 150, category: 'Paneer & Veg Snacks'},
-      
-      // Chopsuey
-      {name: 'Veg Chopsuey', price: 300, category: 'Chopsuey'},
-      {name: 'Non-Veg Chopsuey', price: 320, category: 'Chopsuey'},
-      
-      // Pasta
-      {name: 'Spaghetti Carbonara', price: 350, category: 'Pasta'},
-      {name: 'Spaghetti Bolognese', price: 300, category: 'Pasta'},
-      {name: 'Pesto Penne', price: 300, category: 'Pasta'},
-      {name: 'Pasta', price: 150, category: 'Pasta'},
-      
-      // Food Zone Specials
-      {name: 'Chicken Kathi Roll', price: 180, category: 'Food Zone Specials'},
-      {name: 'Paneer Kathi Roll', price: 200, category: 'Food Zone Specials'},
-      {name: 'Food Zone Special Chicken Burger [KFC]', price: 250, category: 'Food Zone Specials'},
-      {name: 'Food Zone Special Chicken [KFC] (4 pcs)', price: 300, category: 'Food Zone Specials'},
-      {name: 'Veg Manchurian with Rice', price: 250, category: 'Food Zone Specials'},
-      {name: 'Chicken Manchurian with Rice', price: 300, category: 'Food Zone Specials'},
-      {name: 'Veg MoMo Platter', price: 250, category: 'Food Zone Specials'},
-      {name: 'Buff MoMo Platter', price: 300, category: 'Food Zone Specials'},
-      {name: 'Chicken MoMo Platter', price: 300, category: 'Food Zone Specials'},
-      {name: 'Food Zone Special Noodles', price: 250, category: 'Food Zone Specials'},
-      {name: 'Meat Ball', price: 200, category: 'Food Zone Specials'},
-      
-      // Hukka
-      {name: 'Hukka', price: 400, category: 'Hukka'},
-      
-      // Soups
-      {name: 'Mushroom Soup', price: 150, category: 'Soups'},
-      {name: 'Hot & Sour Soup', price: 150, category: 'Soups'},
-      {name: 'Clear Soup', price: 100, category: 'Soups'},
-      {name: 'Chicken Soup', price: 150, category: 'Soups'},
-      
-      // Hot Beverages
-      {name: 'Black Tea', price: 20, category: 'Hot Beverages'},
-      {name: 'Ginger Tea', price: 25, category: 'Hot Beverages'},
-      {name: 'Black Masala', price: 30, category: 'Hot Beverages'},
-      {name: 'Marich Tea', price: 30, category: 'Hot Beverages'},
-      {name: 'Lemon Tea', price: 30, category: 'Hot Beverages'},
-      {name: 'Mint Tea', price: 30, category: 'Hot Beverages'},
-      {name: 'Milk Tea', price: 30, category: 'Hot Beverages'},
-      {name: 'Milk Masala Tea', price: 40, category: 'Hot Beverages'},
-      {name: 'Hot Lemon', price: 50, category: 'Hot Beverages'},
-      {name: 'Ginger Lemon Honey', price: 130, category: 'Hot Beverages'},
-      {name: 'Hot Chocolate', price: 190, category: 'Hot Beverages'},
-      
-      // Cold Beverages
-      {name: 'Ju Ju Dhau', price: 70, category: 'Cold Beverages'},
-      {name: 'Lassi Plain', price: 100, category: 'Cold Beverages'},
-      {name: 'Lassi Sweet', price: 120, category: 'Cold Beverages'},
-      {name: 'Lassi Banana', price: 130, category: 'Cold Beverages'},
-      {name: 'Lemonade', price: 100, category: 'Cold Beverages'},
-      {name: 'Cold Coffee', price: 190, category: 'Cold Beverages'},
-      {name: 'Oreo Milkshake', price: 190, category: 'Cold Beverages'},
-      {name: 'Chocolate Milkshake', price: 190, category: 'Cold Beverages'},
-      {name: 'Virgin Mojito', price: 90, category: 'Cold Beverages'},
-      {name: 'Black Coffee', price: 80, category: 'Cold Beverages'},
-      {name: 'Milk Coffee', price: 120, category: 'Cold Beverages'},
-      {name: 'Coke', price: 70, category: 'Cold Beverages'},
-      {name: 'Fanta', price: 70, category: 'Cold Beverages'},
-      {name: 'Sprite', price: 70, category: 'Cold Beverages'}
-    ];
-    
-    // Insert new menu items
-    for (const item of menuItems) {
-      await query(
-        'INSERT INTO menu_items (name, price, category, description, is_available, preparation_time, is_vegetarian, is_spicy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [item.name, item.price, item.category, item.description || null, true, 15, false, false]
-      );
-    }
-    
-    console.log(`✅ Menu reset complete! Added ${menuItems.length} items`);
-    res.json({ 
-      success: true, 
-      message: `Menu reset successfully with ${menuItems.length} items`,
-      itemCount: menuItems.length
-    });
-    
-  } catch (error) {
-    console.error('❌ Menu reset failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to reset menu',
-      error: error.message
     });
   }
 });
@@ -3427,7 +3093,7 @@ app.put('/api/tables/:tableId/session/status', async (req, res) => {
 });
 
 // Clear table session (admin action)
-app.post('/api/tables/:tableId/clear', async (req, res) => {
+app.post('/api/tables/:tableId/clear', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { tableId } = req.params;
     const tableIdInt = parseInt(tableId);
@@ -3487,7 +3153,7 @@ app.get('/api/tables/:tableId/history', async (req, res) => {
 // ============================================
 
 // Create payment for table session
-app.post('/api/tables/:tableId/payments', async (req, res) => {
+app.post('/api/tables/:tableId/payments', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { tableId } = req.params;
     const { amount, paymentMethod, transactionId } = req.body;
@@ -3592,51 +3258,8 @@ res.status(500).json({ error: 'Failed to get table payments', details: error.mes
 }
 });
 
-// Direct endpoint to populate menu data (for production deployment)
-app.post('/api/populate-menu', async (req, res) => {
-  try {
-    console.log('🔄 Populating menu data...');
-    
-    // First ensure table exists
-    await initializeMenuTable();
-    
-    // Clear existing data
-    await query('DELETE FROM menu_items');
-    
-    // Insert all menu items
-    for (const item of menuItems) {
-      await query(`
-        INSERT INTO menu_items (name, price, category, description, image_url, is_available, preparation_time, is_vegetarian, is_spicy) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [
-        item.name,
-        item.price,
-        item.category,
-        item.description || '',
-        item.image_url || '/images/default-food.jpg',
-        item.is_available !== false,
-        item.preparation_time || 15,
-        item.is_vegetarian || false,
-        item.is_spicy || false
-      ]);
-    }
-    
-    const count = await query('SELECT COUNT(*) as count FROM menu_items');
-    console.log(`✅ Menu populated with ${count.rows[0].count} items`);
-    
-    res.json({ 
-      success: true, 
-      message: `Menu populated with ${count.rows[0].count} items`,
-      count: parseInt(count.rows[0].count)
-    });
-  } catch (error) {
-    console.error('❌ Error populating menu:', error);
-    res.status(500).json({ error: 'Failed to populate menu', details: error.message });
-  }
-});
-
 // Clear all test data endpoint (orders, customers, sessions)
-app.post('/api/clear-all-data', async (req, res) => {
+app.post('/api/clear-all-data', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('🧹 Clearing all test data from database...');
     
@@ -3703,7 +3326,7 @@ app.post('/api/clear-all-data', async (req, res) => {
 });
 
 // Payment API endpoints
-app.post('/api/payments', rateLimits.payments, validationRules.createPayment, async (req, res) => {
+app.post('/api/payments', rateLimits.payments, authenticateToken, requireFrontStaff, validationRules.createPayment, async (req, res) => {
   try {
     const { order_id, payment_method, amount, invoice_number, amount_received, change_given, notes, transaction_id, skip_daybook } = req.body;
     
@@ -3850,7 +3473,7 @@ app.get('/api/payments', async (req, res) => {
 // Daybook API endpoints - IMPORTANT: Specific routes must come before parameterized routes
 
 // Get daybook summary for a specific date (used by reception page)
-app.get('/api/daybook/summary', async (req, res) => {
+app.get('/api/daybook/summary', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -4025,88 +3648,6 @@ app.post('/api/daybook/sync-payments', authenticateToken, async (req, res) => {
   }
 });
 
-// Add QR payment methods to constraint (one-time migration endpoint)
-app.post('/api/daybook/add-qr-payment-constraint', authenticateToken, async (req, res) => {
-  try {
-    console.log('🔧 Adding QR payment methods to database constraints...');
-    
-    // Drop the old constraint
-    await query(`
-      ALTER TABLE daybook_transactions 
-      DROP CONSTRAINT IF EXISTS daybook_transactions_payment_method_check
-    `);
-    
-    // Add new constraint with QR payment methods
-    await query(`
-      ALTER TABLE daybook_transactions 
-      ADD CONSTRAINT daybook_transactions_payment_method_check 
-      CHECK (payment_method IN ('cash', 'card', 'online', 'esewa', 'khalti', 'fonepay') OR payment_method IS NULL)
-    `);
-    
-    console.log('✅ Successfully updated database constraints!');
-    
-    res.json({
-      success: true,
-      message: 'QR payment methods added to constraint'
-    });
-  } catch (error) {
-    console.error('❌ Error updating constraints:', error);
-    res.status(500).json({ error: 'Failed to update constraints', details: error.message });
-  }
-});
-
-// Fix QR payment transaction types (one-time migration endpoint)
-app.post('/api/daybook/fix-qr-payment-types', authenticateToken, async (req, res) => {
-  try {
-    console.log('🔧 Fixing QR payment transaction types...');
-    
-    // Update esewa payments
-    const esewaResult = await query(`
-      UPDATE daybook_transactions
-      SET transaction_type = 'esewa_payment'
-      WHERE payment_method = 'esewa'
-        AND transaction_type != 'esewa_payment'
-      RETURNING id, order_id, payment_method
-    `);
-    
-    // Update khalti payments
-    const khaltiResult = await query(`
-      UPDATE daybook_transactions
-      SET transaction_type = 'khalti_payment'
-      WHERE payment_method = 'khalti'
-        AND transaction_type != 'khalti_payment'
-      RETURNING id, order_id, payment_method
-    `);
-    
-    // Update fonepay payments
-    const fonepayResult = await query(`
-      UPDATE daybook_transactions
-      SET transaction_type = 'fonepay_payment'
-      WHERE payment_method = 'fonepay'
-        AND transaction_type != 'fonepay_payment'
-      RETURNING id, order_id, payment_method
-    `);
-    
-    const totalFixed = esewaResult.rowCount + khaltiResult.rowCount + fonepayResult.rowCount;
-    
-    console.log(`✅ Fixed ${esewaResult.rowCount} eSewa, ${khaltiResult.rowCount} Khalti, ${fonepayResult.rowCount} Fonepay transactions`);
-    
-    res.json({
-      success: true,
-      message: `Fixed ${totalFixed} transactions`,
-      fixed: {
-        esewa: esewaResult.rowCount,
-        khalti: khaltiResult.rowCount,
-        fonepay: fonepayResult.rowCount,
-        total: totalFixed
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error fixing payment types:', error);
-    res.status(500).json({ error: 'Failed to fix payment types', details: error.message });
-  }
-});
-
 // Download daybook data as CSV
 app.get('/api/daybook/download', authenticateToken, async (req, res) => {
   try {
@@ -4151,7 +3692,7 @@ app.get('/api/daybook/download', authenticateToken, async (req, res) => {
 });
 
 // Get recent transactions for monitoring
-app.get('/api/daybook/recent-transactions', async (req, res) => {
+app.get('/api/daybook/recent-transactions', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { limit = 50, date, type } = req.query;
     const params = [];
@@ -4301,7 +3842,7 @@ app.post('/api/daybook/opening-balance', authenticateToken, async (req, res) => 
 });
 
 // Get daybook data for a specific date - MUST come after specific routes
-app.get('/api/daybook/:date', async (req, res) => {
+app.get('/api/daybook/:date', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { date } = req.params;
     
@@ -4371,7 +3912,7 @@ app.get('/api/daybook/:date', async (req, res) => {
 });
 
 // Day Close API endpoint - Close the current day and prepare for next day
-app.post('/api/daybook/close-day', async (req, res) => {
+app.post('/api/daybook/close-day', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { closing_balance, cash_count, notes, date } = req.body;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -4509,7 +4050,7 @@ app.post('/api/daybook/close-day', async (req, res) => {
 });
 
 // Get day status (open/closed)
-app.get('/api/daybook/day-status/:date?', async (req, res) => {
+app.get('/api/daybook/day-status/:date?', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const targetDate = req.params.date || new Date().toISOString().split('T')[0];
     
@@ -4546,7 +4087,7 @@ app.get('/api/daybook/day-status/:date?', async (req, res) => {
 });
 
 // Open Day API endpoint - Reopen a closed day for additional transactions
-app.post('/api/daybook/open-day', async (req, res) => {
+app.post('/api/daybook/open-day', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { date, reason } = req.body;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -4865,6 +4406,11 @@ app.post('/api/contact', async (req, res) => {
 });
 
 // Send a test email to verify SMTP is working (admin only)
+// Email delivery health — configured?, last success/failure, counters
+app.get('/api/admin/email-status', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER]), (req, res) => {
+  res.json({ success: true, status: getEmailStatus() });
+});
+
 app.post('/api/admin/test-email', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER]), async (req, res) => {
   try {
     const { to } = req.body || {};
@@ -4912,8 +4458,31 @@ app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 3000;
 
+// If the staff table is empty, seed the first Manager account from
+// INITIAL_MANAGER_USERNAME / INITIAL_MANAGER_PASSWORD so a fresh deployment
+// can log in without hand-editing the database.
+async function seedInitialManager() {
+  const initialPassword = process.env.INITIAL_MANAGER_PASSWORD;
+  if (!initialPassword) return;
+  try {
+    const existing = await query('SELECT COUNT(*)::int AS count FROM staff');
+    if (existing.rows[0].count > 0) return;
+    const username = process.env.INITIAL_MANAGER_USERNAME || 'admin';
+    const passwordHash = await hashPassword(initialPassword);
+    await query(
+      `INSERT INTO staff (username, password_hash, full_name, role, is_active)
+       VALUES ($1, $2, $3, 'Manager', true)`,
+      [username, passwordHash, 'Administrator']
+    );
+    console.log(`👤 Seeded initial Manager account "${username}" from INITIAL_MANAGER_PASSWORD`);
+  } catch (err) {
+    console.error('⚠️ Failed to seed initial Manager account:', err.message);
+  }
+}
+
 // Initialize settings cache before starting server
-settingsLoader.refresh().then(() => {
+settingsLoader.refresh().then(async () => {
+  await seedInitialManager();
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Restaurant Backend Server running on port ${PORT}`);
     console.log(`📍 Health check available at: http://localhost:${PORT}/health`);

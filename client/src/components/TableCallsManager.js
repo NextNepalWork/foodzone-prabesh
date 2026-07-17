@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../services/apiService';
 import { io } from 'socket.io-client';
+import { getSocketUrl } from '../config/api';
 
 const TableCallsManager = () => {
   const [calls, setCalls] = useState([]);
@@ -14,7 +15,7 @@ const TableCallsManager = () => {
     fetchCalls();
     
     // Setup socket.io listeners
-    const socket = io();
+    const socket = io(getSocketUrl(), { transports: ['websocket', 'polling'] });
     socket.on('tableCall', (call) => {
       console.log('📞 New table call:', call);
       fetchCalls();
