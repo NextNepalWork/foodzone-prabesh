@@ -44,6 +44,12 @@ const TableOrder = () => {
   const [slideComplete, setSlideComplete] = useState(false);
   const slideRef = useRef(null);
   const slideStartX = useRef(0);
+  // State updates are asynchronous, so they cannot be used as the submission
+  // lock for a touch/pointer gesture. Mobile browsers can deliver several move
+  // events after the slider crosses its threshold; this ref is set immediately
+  // and prevents every later event from starting another API request.
+  const submissionInFlightRef = useRef(false);
+  const slideTriggeredRef = useRef(false);
 
   const menuListRef = useRef(null);
 
@@ -159,49 +165,59 @@ const TableOrder = () => {
   }, []);
 
   const handleSubmitOrder = async () => {
+    if (submissionInFlightRef.current) return;
+    submissionInFlightRef.current = true;
+    setIsSubmitting(true);
     setErrorMessage('');
-    
-    if (cartItems.length === 0) {
-      setErrorMessage('Your cart is empty');
-      return;
-    }
 
-    // Check if orders can be placed
-    const orderingStatus = await orderingStatusChecker.canPlaceOrder();
-    if (!orderingStatus.canOrder) {
-      const allowPreOrders = orderingStatusChecker.allowPreOrders();
-      if (!allowPreOrders) {
-        setErrorMessage(orderingStatus.message);
+    try {
+      if (cartItems.length === 0) {
+        setErrorMessage('Your cart is empty');
         resetSlide();
         return;
       }
-      // Pre-orders allowed, show warning but continue
-      console.log('⏰ Pre-order accepted:', orderingStatus.message);
-    }
 
-    // Check minimum order amount
-    const minOrder = orderingStatusChecker.getMinimumOrderAmount('dine-in');
-    const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    if (totalAmount < minOrder) {
-      setErrorMessage(`Minimum order amount is Rs. ${minOrder}. Your order is Rs. ${totalAmount}`);
-      resetSlide();
-      return;
-    }
+      // Check if orders can be placed
+      const orderingStatus = await orderingStatusChecker.canPlaceOrder();
+      if (!orderingStatus.canOrder) {
+        const allowPreOrders = orderingStatusChecker.allowPreOrders();
+        if (!allowPreOrders) {
+          setErrorMessage(orderingStatus.message);
+          resetSlide();
+          return;
+        }
+        // Pre-orders allowed, show warning but continue
+        console.log('⏰ Pre-order accepted:', orderingStatus.message);
+      }
 
-    // Direct order submission (no cart drawer, no name/phone required)
-    await confirmSubmitOrder();
+      // Check minimum order amount
+      const minOrder = orderingStatusChecker.getMinimumOrderAmount('dine-in');
+      const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      if (totalAmount < minOrder) {
+        setErrorMessage(`Minimum order amount is Rs. ${minOrder}. Your order is Rs. ${totalAmount}`);
+        resetSlide();
+        return;
+      }
+
+      // Direct order submission (no cart drawer, no name/phone required)
+      await confirmSubmitOrder();
+    } finally {
+      submissionInFlightRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const handleSlideStart = (e) => {
-    if (isSubmitting || cartItems.length === 0) return;
+    if (submissionInFlightRef.current || cartItems.length === 0) return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
     setIsSliding(true);
-    slideStartX.current = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+    slideStartX.current = e.clientX;
   };
 
   const handleSlideMove = (e) => {
-    if (!isSliding || isSubmitting) return;
-    
-    const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+    if (!isSliding || submissionInFlightRef.current) return;
+
+    const currentX = e.clientX;
     const diff = currentX - slideStartX.current;
     const maxSlide = slideRef.current ? slideRef.current.offsetWidth - 60 : 250;
     
@@ -210,17 +226,20 @@ const TableOrder = () => {
       
       // Sticky threshold at 70% - once you reach this, it auto-completes
       const stickyThreshold = maxSlide * 0.7;
-      if (diff >= stickyThreshold && !slideComplete) {
+      if (diff >= stickyThreshold && !slideTriggeredRef.current) {
+        // Set the ref before starting async work. This is the critical guard
+        // against multiple pointermove events crossing the threshold.
+        slideTriggeredRef.current = true;
         setSlideComplete(true);
         setIsSliding(false);
         setSlidePosition(maxSlide); // Snap to end
-        handleSubmitOrder();
+        void handleSubmitOrder();
       }
     }
   };
 
   const handleSlideEnd = () => {
-    if (!slideComplete && !isSubmitting) {
+    if (!slideTriggeredRef.current && !submissionInFlightRef.current) {
       // If not past sticky threshold, snap back to start
       setSlidePosition(0);
     }
@@ -228,18 +247,14 @@ const TableOrder = () => {
   };
 
   const resetSlide = () => {
+    slideTriggeredRef.current = false;
     setSlidePosition(0);
     setSlideComplete(false);
     setIsSliding(false);
   };
 
   const confirmSubmitOrder = async () => {
-    setIsSubmitting(true);
     setErrorMessage('');
-
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 30000);
-    });
 
     try {
       const orderData = {
@@ -257,10 +272,10 @@ const TableOrder = () => {
         }))
       };
 
-      const response = await Promise.race([
-        apiService.createOrder(orderData),
-        timeoutPromise
-      ]);
+      // Keep the submission lock until the real HTTP request settles. Racing
+      // it with a separate timer used to unlock the UI while Axios could still
+      // be completing the first request in the background.
+      const response = await apiService.createOrder(orderData);
 
       if (response && response.success) {
         // Show full-screen success
@@ -282,7 +297,7 @@ const TableOrder = () => {
       console.error('Error submitting order:', error);
       let errorMsg = 'Failed to submit order. Please try again.';
 
-      if (error.message === 'Request timeout') {
+      if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
         errorMsg = 'Order is taking longer than usual. Please wait a moment and check if your order appears in the system.';
       } else if (error.code === 'ECONNREFUSED' || (error.message || '').includes('fetch') || (error.message || '').includes('Network Error')) {
         errorMsg = 'Connection failed. Please check your internet and try again.';
@@ -296,8 +311,6 @@ const TableOrder = () => {
 
       setErrorMessage(errorMsg);
       resetSlide();
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -573,15 +586,13 @@ const TableOrder = () => {
                 className="absolute left-1 top-1 bottom-1 w-14 bg-white rounded-lg shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-transform"
                 style={{ 
                   transform: `translateX(${slidePosition}px)`,
-                  transition: isSliding ? 'none' : 'transform 0.3s ease'
+                  transition: isSliding ? 'none' : 'transform 0.3s ease',
+                  touchAction: 'none'
                 }}
-                onMouseDown={handleSlideStart}
-                onMouseMove={handleSlideMove}
-                onMouseUp={handleSlideEnd}
-                onMouseLeave={handleSlideEnd}
-                onTouchStart={handleSlideStart}
-                onTouchMove={handleSlideMove}
-                onTouchEnd={handleSlideEnd}
+                onPointerDown={handleSlideStart}
+                onPointerMove={handleSlideMove}
+                onPointerUp={handleSlideEnd}
+                onPointerCancel={handleSlideEnd}
               >
                 <span className="text-2xl">{isSubmitting ? '⏳' : slideComplete ? '✅' : '→'}</span>
               </div>
@@ -725,15 +736,13 @@ const TableOrder = () => {
                           className="absolute left-1 top-1 bottom-1 w-12 bg-white rounded-lg shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-transform"
                           style={{ 
                             transform: `translateX(${slidePosition}px)`,
-                            transition: isSliding ? 'none' : 'transform 0.3s ease'
+                            transition: isSliding ? 'none' : 'transform 0.3s ease',
+                            touchAction: 'none'
                           }}
-                          onMouseDown={handleSlideStart}
-                          onMouseMove={handleSlideMove}
-                          onMouseUp={handleSlideEnd}
-                          onMouseLeave={handleSlideEnd}
-                          onTouchStart={handleSlideStart}
-                          onTouchMove={handleSlideMove}
-                          onTouchEnd={handleSlideEnd}
+                          onPointerDown={handleSlideStart}
+                          onPointerMove={handleSlideMove}
+                          onPointerUp={handleSlideEnd}
+                          onPointerCancel={handleSlideEnd}
                         >
                           <span className="text-2xl">{isSubmitting ? '⏳' : slideComplete ? '✅' : '→'}</span>
                         </div>
