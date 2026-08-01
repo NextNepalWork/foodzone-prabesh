@@ -1117,9 +1117,10 @@ app.post('/api/order', rateLimits.orders, validationRules.createOrder, async (re
     // Send push notification (works even when app is closed / screen locked)
     const orderLabel = order.table_id ? `Table ${order.table_id}` : (order.order_type === 'delivery' ? 'Delivery' : 'Takeaway');
     sendPushToAll({
+      type: 'NEW_ORDER',
       title: '🍽️ New Order!',
       body: `${orderLabel} - NPR ${order.total_amount || order.total || 0}`,
-      orderType: 'NEW_ORDER',
+      orderType: order.order_type,
       orderId: order.id,
       tableId: order.table_id,
       totalAmount: order.total_amount || order.total || 0,

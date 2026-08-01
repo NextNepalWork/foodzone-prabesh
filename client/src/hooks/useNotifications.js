@@ -57,6 +57,7 @@ export const useNotifications = (userType = 'customer') => {
     
     return showNotification(title, {
       body,
+      alertSound: orderType === 'delivery' ? 'delivery-order' : 'table-order',
       tag: `order-${Date.now()}`,
       requireInteraction: true,
       actions: [

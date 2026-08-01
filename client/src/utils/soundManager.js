@@ -11,7 +11,9 @@
 //   { type: 'NAVIGATE', url }           → notification click deep-link
 
 const SOUNDS = {
-  'new-order': '/sounds/notification-bell.mp3',
+  // Generic order alerts intentionally use the table chime. There are only
+  // two new-order sounds on staff surfaces: table/takeaway and delivery.
+  'new-order': '/sounds/table-order.mp3',
   'table-order': '/sounds/table-order.mp3',
   'delivery-order': '/sounds/delivery-order.mp3',
   'kitchen-alarm': '/sounds/kitchen-alarm.mp3',
@@ -38,6 +40,7 @@ class SoundManager {
       try {
         const a = new Audio(src);
         a.preload = 'auto';
+        a.volume = 1;
         this.audio[name] = a;
       } catch (e) { /* no Audio support */ }
     });
@@ -107,6 +110,9 @@ class SoundManager {
     const a = this.audio[name] || this.audio['new-order'];
     if (!a) return;
     try {
+      // 1 is the maximum volume exposed by HTMLMediaElement. The website
+      // cannot override the device/OS master volume or a muted browser tab.
+      a.volume = 1;
       a.currentTime = 0;
       a.play()
         .then(() => { if (!this.unlocked) this.setUnlocked(true); })

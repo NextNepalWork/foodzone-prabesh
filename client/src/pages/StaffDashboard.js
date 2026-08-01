@@ -128,7 +128,7 @@ const StaffDashboard = () => {
             // Play audio if enabled
             const isAudioEnabled = localStorage.getItem('audioEnabled') === 'true';
             if (isAudioEnabled) {
-              playNotificationSound();
+              playNotificationSound(order);
             }
             
             // Show browser notification if enabled
@@ -298,13 +298,15 @@ const StaffDashboard = () => {
     }, 5000);
   };
 
-  const playNotificationSound = () => {
+  const playNotificationSound = (order = null) => {
     try {
       const notificationSettings = settingsService.getNotificationSettings();
       if (!notificationSettings.soundEnabled) {
         return;
       }
-      soundManager.play('new-order');
+      const sound = order?.order_type === 'delivery' ? 'delivery-order' : 'table-order';
+      const tag = order?.id ? `order-${order.id}` : undefined;
+      soundManager.play(sound, tag);
     } catch (error) {
       console.error('Error playing notification sound:', error);
     }

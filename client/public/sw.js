@@ -1,5 +1,5 @@
 // Food Zone PWA Service Worker - Enhanced for Instant Table Loading
-const CACHE_NAME = 'food-zone-v3.0.0';
+const CACHE_NAME = 'food-zone-v3.0.1';
 const API_CACHE = 'food-zone-api-v3.0';
 const TABLE_CACHE = 'food-zone-table-v3.0';
 
@@ -290,7 +290,12 @@ async function syncKitchenOrders() {
 function broadcastPlayAlert(sound, tag) {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
     clientList.forEach((client) => {
-      client.postMessage({ type: 'PLAY_ALERT', sound: sound || 'new-order', tag: tag || 'order' });
+      const pathname = new URL(client.url).pathname;
+      const isStaffSurface = ['/admin', '/staff', '/reception', '/pos', '/kitchen-tv']
+        .some((prefix) => pathname.startsWith(prefix));
+      if (isStaffSurface) {
+        client.postMessage({ type: 'PLAY_ALERT', sound: sound || 'table-order', tag: tag || 'order' });
+      }
     });
   });
 }
@@ -306,10 +311,14 @@ self.addEventListener('push', function(event) {
   // reception desk where incoming orders are handled.
   const targetUrl = data.url || (data.orderId ? `/reception?order=${data.orderId}` : '/reception');
   const tag = data.orderId ? `food-zone-order-${data.orderId}` : 'food-zone-order';
+  const soundTag = data.orderId ? `order-${data.orderId}` : 'order';
+  const alertSound = data.orderType === 'delivery' ? 'delivery-order' : 'table-order';
 
   event.waitUntil(
     Promise.all([
-      broadcastPlayAlert('new-order', tag),
+      // Use the same sound tag as Socket.IO so an open staff page does not
+      // play twice when the socket event and push arrive for the same order.
+      broadcastPlayAlert(alertSound, soundTag),
       self.registration.showNotification(data.title || '🍽️ New Order!', {
         body: data.body || 'You have a new order',
         icon: '/icon-192x192.png',

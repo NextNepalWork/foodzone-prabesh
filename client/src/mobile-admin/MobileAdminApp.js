@@ -23,6 +23,7 @@ import DaybookScreen from './screens/DaybookScreen';
 import StaffScreen from './screens/StaffScreen';
 import Sheet from './components/Sheet';
 import InstallPrompt from './components/InstallPrompt';
+import SoundEnableBanner from '../components/SoundEnableBanner';
 import useInstallPrompt from './hooks/useInstallPrompt';
 import useHaptics from './hooks/useHaptics';
 
@@ -258,6 +259,7 @@ const MobileAdminApp = () => {
 
   return (
     <div className="m-admin">
+      <SoundEnableBanner />
       <AppShell
         title={title}
         leftIcon={inSecondary ? '‹' : null}

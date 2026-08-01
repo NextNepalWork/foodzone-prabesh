@@ -127,14 +127,17 @@ class PushNotificationManager {
       renotify: true
     };
 
-    const notificationOptions = { ...defaultOptions, ...options };
+    // alertSound is app-only metadata; do not pass it to the browser's
+    // Notification constructor as though it were a web notification option.
+    const { alertSound = 'table-order', ...browserOptions } = options;
+    const notificationOptions = { ...defaultOptions, ...browserOptions };
     
     try {
       const notification = new Notification(title, notificationOptions);
       
       // Play the alert through the shared sound engine
       import('./soundManager').then(({ default: soundManager }) => {
-        soundManager.play('new-order');
+        soundManager.play(alertSound, notificationOptions.tag);
       }).catch(error => {
         console.warn('Sound manager import failed:', error);
       });
