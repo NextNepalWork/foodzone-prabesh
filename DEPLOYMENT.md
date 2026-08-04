@@ -1,59 +1,73 @@
-# Deployment Runbook — one restaurant, one deployment
+# Deployment runbook — one restaurant, one deployment
 
-Backend on **Railway** (Express + PostgreSQL + Socket.IO), frontend on **Netlify or Vercel** (static React build). Any equivalent hosts work — the app only needs Node 20+, PostgreSQL, and a static host.
+The production layout is a Hostinger VPS for the Express backend, PostgreSQL,
+Socket.IO, and persistent uploads, with the React/PWA frontend on Vercel. See
+[`HOSTINGER-MIGRATION.md`](HOSTINGER-MIGRATION.md) for the guarded migration
+sequence from Railway.
 
-## 1. Backend (Railway)
+## 1. Backend on Hostinger VPS
 
-1. New Project → Deploy from GitHub repo. `railway.toml` builds and starts from `server/` (healthcheck `/api/health`).
-2. Add **PostgreSQL** to the project; Railway injects `DATABASE_URL` automatically.
-3. Initialize the schema once (from your machine):
-   ```bash
-   psql "$DATABASE_URL" -f create-all-tables.sql
-   ```
-4. Set service variables:
-   ```
-   NODE_ENV=production
-   JWT_SECRET=<64+ random chars>          # openssl rand -hex 48
-   INITIAL_MANAGER_USERNAME=admin
-   INITIAL_MANAGER_PASSWORD=<strong password>   # remove after first login
-   ALLOWED_ORIGINS=https://<restaurant-domain>,https://www.<restaurant-domain>
-   VAPID_PUBLIC_KEY=...                   # npx web-push generate-vapid-keys
-   VAPID_PRIVATE_KEY=...
-   VAPID_SUBJECT=mailto:admin@<restaurant-domain>
-   SMTP_HOST=smtp.hostinger.com           # or your provider
-   SMTP_PORT=465
-   SMTP_SECURE=true
-   SMTP_USER=orders@<restaurant-domain>
-   SMTP_PASS=<smtp password>
-   EMAIL_FROM=orders@<restaurant-domain>
-   ```
-5. Deploy. First boot seeds the Manager account and logs `Seeded initial Manager account`.
+Use the Hostinger Ubuntu 24.04 Docker VPS template. PostgreSQL is not supported
+as a local database on Hostinger's regular Web or Cloud hosting plans, and this
+application also requires a persistent server process and WebSockets.
 
-## 2. Frontend (Netlify or Vercel)
+The checked-in deployment includes:
 
-- Build: `cd client && npm run build`, publish `client/build` (root `netlify.toml` already does this; `client/vercel.json` for Vercel).
-- Environment (build-time):
-  ```
-  REACT_APP_API_URL=https://<railway-backend-url>
-  REACT_APP_SOCKET_URL=wss://<railway-backend-url>
-  ```
-- Point the restaurant domain's DNS at the frontend host; add the domain to the backend's `ALLOWED_ORIGINS`.
+- `Dockerfile`: Node 22 production application image;
+- `docker-compose.hostinger.yml`: app, PostgreSQL 18, and Caddy services;
+- `Caddyfile`: automatic HTTPS and reverse proxying, including Socket.IO;
+- `hostinger.env.example`: safe environment-variable template;
+- named volumes for PostgreSQL, uploaded receipts/QR codes, and TLS state.
 
-> Alternative single-host mode: copy `client/build/*` into `server/public/` and let the backend serve the SPA (`NODE_ENV=production` enables the catch-all route). Remember to re-copy after every client change — the PWA manifests and `sw.js` live in that build.
+On the VPS, copy `hostinger.env.example` to `.env.hostinger`, fill it securely,
+and keep it out of Git. For a brand-new empty restaurant only, initialize the
+schema once and use `INITIAL_MANAGER_PASSWORD`. For an existing restaurant,
+restore the production dump before starting the app and never seed another
+manager account.
+
+Start or update the stack from the repository root:
+
+```bash
+docker compose --env-file .env.hostinger \
+  -f docker-compose.hostinger.yml up -d --build
+```
+
+The public health endpoint is `/api/health`. PostgreSQL is bound only to VPS
+loopback for SSH-tunnel maintenance and must not be opened in the firewall.
+
+## 2. Frontend on Vercel
+
+Build from `client/` with `npm run build`. Set these build-time variables:
+
+```text
+REACT_APP_API_URL=https://api.foodzone.com.np
+REACT_APP_SOCKET_URL=https://api.foodzone.com.np
+```
+
+Preserve `REACT_APP_GOOGLE_MAPS_API_KEY` if Maps is enabled. Do not use the
+legacy client-side `REACT_APP_ADMIN_PASSWORD`; authentication belongs on the
+backend and secrets must never be embedded in a React build.
+
+Point the frontend domain at Vercel and the API hostname at the Hostinger VPS.
+Include every Vercel production/preview origin that should be allowed in the
+backend `ALLOWED_ORIGINS` value.
 
 ## 3. Restaurant onboarding
 
-1. `/admin` → log in with the seeded Manager account → change the password (Admin → Staff → reset password), then remove `INITIAL_MANAGER_PASSWORD` from the env.
-2. Settings → Business: name, logo, brand color, phone, address, currency, VAT/service charge, operating hours. These drive the customer app, receipts, and PWA branding.
-3. Settings → Integrations: upload payment QR codes (eSewa / Khalti / FonePay).
-4. Settings → Notifications: notification email + per-order-type email toggles; use **Send test email** to verify SMTP.
-5. Admin → Staff: create Cashier / Chef / Waiter / Kitchen Helper accounts.
-6. Admin → Menu: enter or import the menu (`server/scripts/import-menu-from-csv.js`).
-7. Settings → Tables: set table count, print QR codes for tables.
+1. `/admin` → log in as Manager → change any initial password, then remove
+   `INITIAL_MANAGER_PASSWORD` from the environment.
+2. Settings → Business: name, logo, colors, phone, address, currency, VAT,
+   service charge, and operating hours.
+3. Settings → Integrations: upload eSewa, Khalti, and FonePay QR images.
+4. Settings → Notifications: notification email and per-order-type toggles;
+   send a test email.
+5. Admin → Staff: create Cashier, Chef, Waiter, and Kitchen Helper accounts.
+6. Admin → Menu: enter or import the menu.
+7. Settings → Tables: set table count and print table QR codes.
 
-## 4. Station setup (PWAs)
+## 4. Station PWAs
 
-On each device, open the page for its role and use the browser's **Install app / Add to Home Screen** — the installed app always opens on that page:
+Install the PWA from the page used by each device:
 
 | Station | Install from |
 |---|---|
@@ -63,19 +77,22 @@ On each device, open the page for its role and use the browser's **Install app /
 | Manager phone/desktop | `/admin` |
 | Waiter phones | `/staff` |
 
-After installing, tap **Enable sound** (amber banner) once so order alerts ring, and allow notifications when prompted (push notifications deep-link to the order when tapped).
+On each device, tap **Enable sound** once and allow browser notifications.
 
 ## 5. Smoke test
 
-- Customer: scan a table QR (`/<tableId>`), place an order.
-- Kitchen: order appears on `/kitchen-tv` instantly with a chime.
-- POS: ring up a takeaway sale with a discount, cash payment → receipt + KOT print, sale visible in Daybook and Admin → Reports.
-- Reception: take payment on the table order, clear the table, close the day.
-- Email: test-email button round-trips; order email arrives if enabled.
-- `GET https://<backend>/api/health` returns OK (Railway healthcheck uses this).
+- Scan a table QR, place one test order, and confirm it appears exactly once.
+- Confirm the kitchen, reception, staff, and admin views update immediately.
+- Confirm the table and delivery sounds are loud and distinct.
+- Complete a POS takeaway sale, print its receipt/KOT, and verify reports.
+- Upload and view a payment receipt and each payment QR image.
+- Send a test email.
+- Confirm `GET https://api.foodzone.com.np/api/health` succeeds.
 
-## Notes
+## 6. Backups and updates
 
-- Node 20+ (`engines` in package.json, `nixpacks.toml`, `Dockerfile` are aligned).
-- Service-worker cache is versioned (`client/public/sw.js` `CACHE_NAME`); bump it on releases — installed clients auto-update via SKIP_WAITING.
-- If credentials ever leak, rotate: DB password, `JWT_SECRET`, SMTP password, VAPID keys, staff passwords.
+Keep encrypted PostgreSQL dumps and upload archives outside the VPS in addition
+to Hostinger VPS snapshots. Never rely on one disk or one provider as the only
+copy. Before an application update, take a backup, fast-forward the repository,
+and rebuild only the app service. Named database and upload volumes remain
+independent of the application image.

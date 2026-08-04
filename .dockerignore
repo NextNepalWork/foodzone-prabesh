@@ -1,0 +1,11 @@
+.git
+.github
+**/.env
+**/.env.*
+node_modules
+**/node_modules
+client
+migration-backups
+server/uploads
+npm-debug.log*
+*.md

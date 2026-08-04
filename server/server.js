@@ -51,6 +51,12 @@ const settingsLoader = require('./utils/settingsLoader');
 const orderingHoursValidator = require('./utils/orderingHoursValidator');
 
 const app = express();
+// Caddy/Hostinger terminates HTTPS one hop in front of Express. Trust exactly
+// that proxy when enabled so rate limits use the real client IP while direct
+// deployments keep Express's safer default.
+if (String(process.env.TRUST_PROXY || '').toLowerCase() === 'true') {
+  app.set('trust proxy', 1);
+}
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {

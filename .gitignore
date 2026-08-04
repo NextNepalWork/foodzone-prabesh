@@ -89,3 +89,11 @@ Thumbs.db
 # Local Netlify folder
 .netlify
 .vercel
+
+# Migration artifacts (database dumps and upload archives may contain
+# customer/order data and must never be committed)
+migration-backups/
+.migration-env
+
+# Runtime uploads belong on the Hostinger persistent volume, never in source control.
+server/uploads/

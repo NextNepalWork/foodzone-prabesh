@@ -7,6 +7,17 @@ if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL && !proce
   process.exit(1);
 }
 
+// Production databases are often remote and require TLS. A PostgreSQL server
+// running beside the app on a private Docker network normally does not. Keep
+// the existing secure production default while allowing an explicit opt-out
+// for that private-network deployment.
+const sslSetting = String(process.env.DB_SSL || '').trim().toLowerCase();
+const databaseSsl = sslSetting === 'false' || sslSetting === '0' || sslSetting === 'disable'
+  ? false
+  : process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false;
+
 // Get database configuration directly from environment variables
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -14,7 +25,7 @@ const dbConfig = {
   database: process.env.DB_NAME || 'restaurant_db',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: databaseSsl,
   // Set timezone to Nepal Time (UTC+5:45)
   options: '-c timezone=Asia/Kathmandu'
 };
