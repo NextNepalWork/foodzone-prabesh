@@ -2,7 +2,20 @@
 	email {$TLS_EMAIL}
 }
 
+# Public API domain. It sits behind Cloudflare's proxy (SSL mode "Full"),
+# so the origin serves Caddy's internal certificate; visitors only ever see
+# Cloudflare's edge certificate. Let's Encrypt HTTP-01 cannot complete
+# through the proxy, which is why this block does not use it.
 {$API_DOMAIN} {
+	tls internal
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+# Direct (unproxied) hostname of the server itself — gets a real
+# Let's Encrypt certificate. Used for smoke tests and as a bypass
+# path that does not depend on Cloudflare.
+{$DIRECT_DOMAIN:localhost} {
 	encode zstd gzip
 	reverse_proxy app:3000
 }
