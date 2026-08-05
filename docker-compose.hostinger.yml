@@ -1,5 +1,13 @@
 name: foodzone
 
+# TLS/routing note: this stack no longer runs its own Caddy. The VPS hosts
+# several applications behind one shared ingress proxy (/opt/ingress) that
+# owns ports 80/443; foodzone contributes /opt/ingress/sites/foodzone.caddy
+# and joins the external "edge" network with its app container only. The
+# database stays on the project-private network, unreachable from other
+# projects. Deploying the app must keep the edge attachment — that is what
+# lets the ingress reach foodzone-app-1:3000.
+
 services:
   db:
     image: postgres:18-bookworm
@@ -49,32 +57,18 @@ services:
       - uploads:/app/server/uploads
     expose:
       - "3000"
+    networks:
+      - default
+      - edge
 
-  caddy:
-    image: caddy:2.10-alpine
-    restart: unless-stopped
-    environment:
-      API_DOMAIN: ${API_DOMAIN}
-      DIRECT_DOMAIN: ${DIRECT_DOMAIN:-localhost}
-      TLS_EMAIL: ${TLS_EMAIL}
-    depends_on:
-      app:
-        condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+networks:
+  default:
+  # Shared with the host-wide ingress proxy; created by /opt/ingress.
+  edge:
+    external: true
 
 volumes:
   postgres_data:
     name: foodzone_postgres_data
   uploads:
     name: foodzone_uploads
-  caddy_data:
-    name: foodzone_caddy_data
-  caddy_config:
-    name: foodzone_caddy_config
