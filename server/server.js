@@ -3828,12 +3828,14 @@ app.post('/api/daybook/transaction', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'transaction_type and amount are required' });
     }
 
-    const txDate = date ? String(date).split('T')[0] : new Date().toISOString().split('T')[0];
+    // Fall back to CURRENT_DATE (database timezone = restaurant time), not the
+    // Node process's UTC date — they differ between midnight and 05:45 NPT.
+    const txDate = date ? String(date).split('T')[0] : null;
 
     const result = await query(`
       INSERT INTO daybook_transactions
-        (transaction_date, transaction_type, category, amount, description, order_id, payment_method, reference_id, created_by, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        (transaction_date, transaction_type, category, amount, description, order_id, payment_method, reference, created_by, created_at)
+      VALUES (COALESCE($1::date, CURRENT_DATE), $2, $3, $4, $5, $6, $7, $8, $9, NOW())
       RETURNING *
     `, [
       txDate,
