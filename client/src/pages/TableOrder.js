@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { apiService } from '../services/apiService';
+import { apiService, fetchApi } from '../services/apiService';
 import io from 'socket.io-client';
+import HappyHourSection from '../components/HappyHourSection';
 import { getSocketUrl } from '../config/api';
 import { useCart } from '../context/CartContext';
 import { useTableCount } from '../hooks/useSettings';
@@ -26,6 +27,8 @@ const TableOrder = () => {
   }, [tableCount]);
 
   const [menuItems, setMenuItems] = useState([]);
+  const [isHappyHour, setIsHappyHour] = useState(false);
+  const [happyHourEnabled, setHappyHourEnabled] = useState(true);
   const [showCheckout, setShowCheckout] = useState(false);
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '' });
   const [orderSubmitted, setOrderSubmitted] = useState(false);
@@ -80,9 +83,38 @@ const TableOrder = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, tableCount]);
 
+  // Happy hour: same rules as the /menu page — 11:00-13:59, not Saturday,
+  // and the admin toggle (happyhour.enabled) must be on.
+  useEffect(() => {
+    const checkHappyHour = () => {
+      const now = new Date();
+      const isHappyHourTime = now.getHours() >= 11 && now.getHours() < 14;
+      const isNotSaturday = now.getDay() !== 6;
+      setIsHappyHour(isHappyHourTime && isNotSaturday && happyHourEnabled);
+    };
+
+    const fetchHappyHourSettings = async () => {
+      try {
+        const response = await fetchApi.get('/api/settings/happy-hour');
+        setHappyHourEnabled(response.enabled !== false);
+      } catch (error) {
+        console.error('Error fetching happy hour settings:', error);
+      }
+    };
+
+    fetchHappyHourSettings();
+    checkHappyHour();
+    const interval = setInterval(checkHappyHour, 60000);
+    return () => clearInterval(interval);
+  }, [happyHourEnabled]);
+
   // Socket connection for real-time table clearing
   useEffect(() => {
     const socket = io(getSocketUrl());
+
+    socket.on('happyHourSettingsUpdated', ({ enabled }) => {
+      setHappyHourEnabled(enabled);
+    });
 
     socket.on('tableCleared', (data) => {
       console.log('🔔 Table cleared event received:', data);
@@ -320,6 +352,17 @@ const TableOrder = () => {
     setErrorMessage('');
   };
 
+  // Same fixed happy-hour specials as the /menu page (ids outside the real
+  // menu range; order_items has no FK to menu_items so they order fine)
+  const happyHourItems = useMemo(() => [
+    { id: 1001, name: 'Chicken Momo', price: 125, category: 'Happy Hour', description: 'Delicious steamed chicken dumplings' },
+    { id: 1002, name: 'Chicken Fried Rice', price: 145, category: 'Happy Hour', description: 'Aromatic fried rice with tender chicken pieces' },
+    { id: 1003, name: 'Veg Fried Rice', price: 110, category: 'Happy Hour', description: 'Flavorful vegetarian fried rice with fresh vegetables' },
+    { id: 1004, name: 'Burger', price: 150, category: 'Happy Hour', description: 'Juicy beef burger with fresh toppings' },
+    { id: 1005, name: 'Chicken Chowmein', price: 110, category: 'Happy Hour', description: 'Stir-fried noodles with chicken and vegetables' },
+    { id: 1006, name: 'Veg Chowmein', price: 80, category: 'Happy Hour', description: 'Vegetarian stir-fried noodles with fresh vegetables' }
+  ], []);
+
   // Derived: categories list, with All always first
   const categories = useMemo(() => {
     const set = new Set();
@@ -501,6 +544,17 @@ const TableOrder = () => {
           WebkitOverflowScrolling: 'touch'
         }}
       >
+        {isHappyHour && (
+          <HappyHourSection
+            happyHourItems={happyHourItems}
+            getItemQuantity={(id) => cartItems.find(c => c.id === id)?.quantity || 0}
+            handleAddToCart={(item) => addToCart(item, 1)}
+            handleUpdateQuantity={updateQuantity}
+            isTableCustomer={true}
+            currentTable={tableId}
+          />
+        )}
+
         {filteredMenuItems.length === 0 ? (
           <div className="text-center py-12 text-slate-500">
             <div className="text-4xl mb-2">🍽️</div>

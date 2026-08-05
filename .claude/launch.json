@@ -8,6 +8,24 @@
       "cwd": "client",
       "env": { "PORT": "3001", "BROWSER": "none" },
       "port": 3001
+    },
+    {
+      "name": "server-local",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "cwd": "server",
+      "env": {
+        "DATABASE_URL": "",
+        "DB_SSL": "false",
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_NAME": "foodzone_local",
+        "DB_USER": "aasmidhungana",
+        "DB_PASSWORD": "",
+        "JWT_SECRET": "local-dev-only-secret",
+        "PORT": "3002"
+      },
+      "port": 3002
     }
   ]
 }
