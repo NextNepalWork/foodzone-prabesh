@@ -15,7 +15,7 @@ export const CRITICAL_COMPONENTS = {
 // Non-critical components that can load later
 export const NON_CRITICAL_COMPONENTS = {
   StaffDashboard: lazy(() => import('../pages/StaffDashboard')),
-  Reception: lazy(() => import('../pages/Reception')),
+  POS: lazy(() => import('../pages/POS')),
   DeliveryCart: lazy(() => import('../pages/DeliveryCart'))
 };
 

@@ -4,7 +4,7 @@ import { useTableCount } from '../../hooks/useSettings';
 import { useDateTimeFormatter } from '../../hooks/useDateTimeFormatter';
 import { printReceipt, printKOT as printSharedKOT } from '../../utils/printing';
 
-const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refreshTrigger }) => {
+const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refreshTrigger, onEditOrder }) => {
   const tableCount = useTableCount(); // Get table count from settings
   const [activeFilter, setActiveFilter] = useState(() => {
     return localStorage.getItem('orderManagementActiveFilter') || 'all';
@@ -58,13 +58,13 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      // Check if user is authenticated with retry mechanism
-      const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
+      // Admin token, or a front-desk staff token (POS station) — either works;
+      // fetchApi sends whichever is present and the server enforces roles.
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken') || localStorage.getItem('staffToken');
       if (!token) {
-        console.log('⚠️ No admin token found, checking admin authentication...');
         const isAdminAuthenticated = localStorage.getItem('adminAuthenticated') === 'true';
         if (!isAdminAuthenticated) {
-          console.log('⚠️ Admin not authenticated, orders will be empty');
+          console.log('⚠️ Not authenticated, orders will be empty');
           setOrders([]);
           setLoading(false);
           return;
@@ -343,7 +343,9 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
     console.log('🔄 All filters reset, showing all orders');
   };
   
-  const dineInOrders = orders.filter(o => o.order_type === 'dine-in' || o.order_type === 'dine_in' || (!o.order_type && o.table_id));
+  // Takeaway rides in the main (dine-in) column — previously it matched neither
+  // bucket and takeaway orders were invisible on this screen.
+  const dineInOrders = orders.filter(o => o.order_type === 'dine-in' || o.order_type === 'dine_in' || o.order_type === 'takeaway' || (!o.order_type && o.table_id));
   const deliveryOrders = orders.filter(o => o.order_type === 'delivery' || (!o.order_type && o.address));
 
   const filterTabs = [
@@ -519,13 +521,14 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
                   <OrderCard
                     key={order.id}
                     order={order}
-                    type="dine-in"
+                    type={order.order_type === 'takeaway' ? 'takeaway' : 'dine-in'}
                     onClearTable={onClearTable}
                     onCompleteOrder={onCompleteOrder}
                     onDeleteOrder={onDeleteOrder}
                     onViewDetails={viewOrderDetails}
                     onRefresh={fetchOrders}
                     compact={true}
+                    onEditOrder={onEditOrder}
                   />
                 ))
               )}
@@ -570,6 +573,7 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
                     onRefresh={fetchOrders}
                     compact={true}
                     mini={true}
+                    onEditOrder={onEditOrder}
                   />
                 ))
               )}
@@ -834,7 +838,7 @@ const OrdersManagement = ({ onClearTable, onCompleteOrder, onDeleteOrder, refres
 };
 
 // Premium Order Card Component
-const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, onViewDetails, onRefresh, compact, mini }) => {
+const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, onViewDetails, onRefresh, compact, mini, onEditOrder }) => {
   const { formatTime: formatTimeWithTZ, formatDate: formatDateWithTZ } = useDateTimeFormatter();
   
   const getStatusColor = (status) => {
@@ -908,6 +912,11 @@ const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, 
           {order.status === 'pending' && (
             <button onClick={() => updateOrderStatus(order.id, 'preparing')} className="flex-1 bg-blue-600 text-white py-1 px-2 rounded text-[10px] font-medium hover:bg-blue-700">
               Prepare
+            </button>
+          )}
+          {order.status === 'pending' && onEditOrder && (
+            <button onClick={() => onEditOrder(order)} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-medium hover:bg-amber-200" title="Edit items (only while pending)">
+              ✏️
             </button>
           )}
           {order.status === 'preparing' && (
@@ -999,6 +1008,11 @@ const OrderCard = ({ order, type, onClearTable, onCompleteOrder, onDeleteOrder, 
           {order.status === 'pending' && (
             <button onClick={() => updateOrderStatus(order.id, 'preparing')} className="flex-1 bg-blue-600 text-white py-1.5 px-3 rounded-lg text-xs font-medium hover:bg-blue-700">
               🔥 Start Preparing
+            </button>
+          )}
+          {order.status === 'pending' && onEditOrder && (
+            <button onClick={() => onEditOrder(order)} className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-200" title="Edit items (only while pending)">
+              ✏️ Edit
             </button>
           )}
           {order.status === 'preparing' && (

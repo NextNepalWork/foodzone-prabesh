@@ -17,6 +17,9 @@ const StaffManagement = () => {
   const [showPasswordField, setShowPasswordField] = useState(false);
 
   const roles = ['Manager', 'Chef', 'Waiter', 'Cashier', 'Kitchen Helper'];
+  // The stored role value stays 'Cashier' (tokens, server checks) but the
+  // front desk position is called Receptionist everywhere users see it.
+  const roleLabel = (role) => (role === 'Cashier' ? 'Receptionist' : role);
 
   useEffect(() => {
     fetchStaff();
@@ -229,7 +232,7 @@ const StaffManagement = () => {
                     </td>
                     <td className="py-4 px-6">
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(member.role)}`}>
-                        {member.role}
+                        {roleLabel(member.role)}
                       </span>
                     </td>
                     <td className="py-4 px-6">
@@ -403,7 +406,7 @@ const StaffManagement = () => {
                   required
                 >
                   {roles.map(role => (
-                    <option key={role} value={role}>{role}</option>
+                    <option key={role} value={role}>{roleLabel(role)}</option>
                   ))}
                 </select>
               </div>

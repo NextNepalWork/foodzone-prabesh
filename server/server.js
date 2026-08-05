@@ -1635,7 +1635,7 @@ app.get('/api/order-history', async (req, res) => {
 });
 
 // Delete order with proper authentication
-app.delete('/api/order/:orderId', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/api/order/:orderId', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CASHIER]), async (req, res) => {
   try {
     const { orderId } = req.params;
     
@@ -1913,6 +1913,85 @@ app.put('/api/orders/:orderId/status', authenticateToken, requireStaffRole([STAF
   } catch (error) {
     console.error('❌ Error updating order status:', error);
     res.status(500).json({ error: 'Failed to update order status', details: error.message });
+  }
+});
+
+// Replace a pending order's items (front desk fixing a mistaken order).
+// Refused once the kitchen has started — enforced server-side, not just in UI.
+app.put('/api/orders/:orderId/items', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CASHIER]), async (req, res) => {
+  const { orderId } = req.params;
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, error: 'Order must contain at least one item' });
+  }
+  for (const item of items) {
+    const price = parseFloat(item.price);
+    const quantity = parseInt(item.quantity);
+    if (!item.name || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 1) {
+      return res.status(400).json({ success: false, error: 'Each item needs a name, a non-negative price and a quantity of at least 1' });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+    const order = orderResult.rows[0];
+    if (order.status !== 'pending') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, error: `Order is already ${order.status} — items can only be changed while the order is pending` });
+    }
+
+    await client.query('DELETE FROM order_items WHERE order_id = $1', [orderId]);
+    for (const item of items) {
+      const price = parseFloat(item.price);
+      const quantity = parseInt(item.quantity);
+      await client.query(`
+        INSERT INTO order_items (
+          order_id, menu_item_id, menu_item_name, menu_item_category,
+          price, quantity, subtotal, special_instructions
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [
+        orderId, item.id || null, item.name, item.category || null,
+        price, quantity, price * quantity, item.instructions || null
+      ]);
+    }
+
+    const subtotal = items.reduce((sum, i) => sum + parseFloat(i.price) * parseInt(i.quantity), 0);
+    const deliveryFee = parseFloat(order.delivery_fee) || 0;
+    const discount = Math.min(parseFloat(order.discount) || 0, subtotal + deliveryFee);
+    const total = subtotal + deliveryFee - discount;
+
+    const updated = await client.query(`
+      UPDATE orders
+      SET subtotal = $1, discount = $2, total = $3, total_amount = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+      RETURNING *
+    `, [subtotal, discount, total, orderId]);
+
+    await client.query('COMMIT');
+
+    const itemsResult = await query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
+    const updatedOrder = { ...updated.rows[0], items: itemsResult.rows };
+
+    // orderStatusUpdated makes every open dashboard refetch; orderUpdated carries the payload
+    io.emit('orderUpdated', updatedOrder);
+    io.emit('orderStatusUpdated', { orderId: parseInt(orderId), status: 'pending' });
+
+    console.log(`✏️ Order ${order.order_number} items edited by ${req.user?.username || 'staff'} — new total NPR ${total}`);
+    res.json({ success: true, message: 'Order updated', order: updatedOrder });
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error('❌ Error editing order items:', error);
+    res.status(500).json({ success: false, error: 'Failed to update order items', details: error.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -4228,7 +4307,7 @@ app.post('/api/table-calls', async (req, res) => {
 });
 
 // Get all pending table calls (for admin)
-app.get('/api/table-calls', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.WAITER]), async (req, res) => {
+app.get('/api/table-calls', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const result = await query(
       `SELECT * FROM table_calls 
@@ -4244,7 +4323,7 @@ app.get('/api/table-calls', authenticateToken, requireStaffRole([STAFF_ROLES.MAN
 });
 
 // Respond to a table call (mark as responded)
-app.put('/api/table-calls/:callId/respond', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.WAITER]), async (req, res) => {
+app.put('/api/table-calls/:callId/respond', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { callId } = req.params;
     
@@ -4277,7 +4356,7 @@ app.put('/api/table-calls/:callId/respond', authenticateToken, requireStaffRole(
 });
 
 // Resolve a table call (mark as resolved)
-app.put('/api/table-calls/:callId/resolve', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.WAITER]), async (req, res) => {
+app.put('/api/table-calls/:callId/resolve', authenticateToken, requireFrontStaff, async (req, res) => {
   try {
     const { callId } = req.params;
     const { notes } = req.body;

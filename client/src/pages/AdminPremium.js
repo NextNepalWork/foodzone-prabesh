@@ -624,7 +624,7 @@ const AdminPremium = () => {
       alert('Access Denied: You do not have permission to access the admin panel.');
       localStorage.removeItem('adminAuthenticated');
       setIsAuthenticated(false);
-      window.location.href = '/reception';
+      window.location.href = '/pos';
       return;
     }
 
@@ -847,7 +847,7 @@ const AdminPremium = () => {
           if (data.user && data.user.role && data.user.role !== 'admin') {
             const role = data.user.role.toLowerCase();
             if (role === 'chef' || role === 'waiter') { window.location.href = '/staff'; return; }
-            if (role === 'cashier') { window.location.href = '/reception'; return; }
+            if (role === 'cashier') { window.location.href = '/pos'; return; }
           }
           setIsAuthenticated(true);
           const timeouts = settingsService.getTimeoutSettings();

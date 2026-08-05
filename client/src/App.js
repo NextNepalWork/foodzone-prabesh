@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import TableBanner from './components/TableBanner';
 import FloatingCart from './components/FloatingCart';
@@ -26,9 +26,6 @@ const AdminPremium = React.lazy(() =>
 );
 const StaffDashboard = React.lazy(() => 
   import(/* webpackChunkName: "staff" */ './pages/StaffDashboard')
-);
-const Reception = React.lazy(() =>
-  import(/* webpackChunkName: "staff" */ './pages/Reception')
 );
 const KitchenTV = React.lazy(() =>
   import(/* webpackChunkName: "kitchen-tv" */ './pages/KitchenTV')
@@ -113,7 +110,7 @@ const AppContent = React.memo(() => {
           {/* Staff Role-Based Pages */}
           <Route path="/staff" element={<StaffDashboard />} /> {/* Chef & Waiter Dashboard */}
           <Route path="/pos" element={<POS />} /> {/* Counter-sale POS — Cashier/Manager */}
-          <Route path="/reception" element={<Reception />} /> {/* Cashier Dashboard */}
+          <Route path="/reception" element={<Navigate to="/pos" replace />} /> {/* Old reception → unified POS station */}
           <Route path="/kitchen-tv" element={<KitchenTV />} /> {/* Kitchen TV — touch screen for Chef/Kitchen Helper */}
           <Route path="/admin" element={<AdminRouter DesktopAdmin={AdminPremium} />} /> {/* Manager Dashboard */}
 

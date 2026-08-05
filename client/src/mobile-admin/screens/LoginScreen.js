@@ -30,7 +30,7 @@ const LoginScreen = ({ onAuthed }) => {
         if (data.user && data.user.role && data.user.role !== 'admin') {
           const role = data.user.role.toLowerCase();
           if (role === 'chef' || role === 'waiter') { window.location.href = '/staff'; return; }
-          if (role === 'cashier') { window.location.href = '/reception'; return; }
+          if (role === 'cashier') { window.location.href = '/pos'; return; }
         }
         haptics.success();
         onAuthed && onAuthed(data);

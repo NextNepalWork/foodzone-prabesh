@@ -1,22 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import io from 'socket.io-client';
 import { fetchApi } from '../services/apiService';
-import { getApiUrl } from '../config/api';
+import { getApiUrl, getSocketUrl } from '../config/api';
 import settingsService from '../services/settingsService';
 import staffAuthService from '../utils/staffAuthService';
+import soundManager from '../utils/soundManager';
 import { printReceipt, printKOT, getRestaurantInfo } from '../utils/printing';
 import POSItemGrid from '../components/pos/POSItemGrid';
 import POSCart from '../components/pos/POSCart';
 import POSPaymentPanel from '../components/pos/POSPaymentPanel';
 import POSTransactions from '../components/pos/POSTransactions';
+import PosOrdersTab from '../components/pos/PosOrdersTab';
+import PosTablesTab from '../components/pos/PosTablesTab';
+import PosVerifyTab from '../components/pos/PosVerifyTab';
+import TableCallsManager from '../components/TableCallsManager';
 import SoundEnableBanner from '../components/SoundEnableBanner';
-import { ReceiptIcon, BookIcon, DeskIcon, CheckIcon, XIcon, PrinterIcon } from '../components/pos/icons';
+import { ReceiptIcon, BookIcon, CheckIcon, XIcon, PrinterIcon } from '../components/pos/icons';
 
 const POS_ROLES = ['Manager', 'Cashier'];
 
 const emptyMeta = { tableId: '', customerName: '', phone: '', address: '' };
 
-// Counter-sale Point of Sale for Cashier / Manager / admin.
-// Flow: build cart → charge → POST /api/order → POST /api/payments → print.
+// The front-desk station: counter sales, the live orders board, tables,
+// table calls, and QR payment verification — everything operational, so the
+// admin panel can stay owner-only. Runs for Manager / Receptionist / admin.
 const POS = () => {
   // ---- auth ----
   const getAuthState = () => {
@@ -33,6 +40,21 @@ const POS = () => {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+
+  // ---- station state ----
+  const [view, setView] = useState('sell');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [orderBadge, setOrderBadge] = useState(0);
+  const [callBadge, setCallBadge] = useState(0);
+  const [toasts, setToasts] = useState([]);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  const pushToast = useCallback((message, type = 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev.slice(-3), { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  }, []);
 
   // ---- data ----
   const [menuItems, setMenuItems] = useState([]);
@@ -73,6 +95,53 @@ const POS = () => {
       }
     })();
     return () => { cancelled = true; };
+  }, [auth.ok]);
+
+  // ---- live updates: one socket for the whole station ----
+  useEffect(() => {
+    if (!auth.ok) return;
+    const socket = io(getSocketUrl(), {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
+
+    socket.on('newOrder', (order) => {
+      if (order?.order_type === 'delivery') soundManager.play('delivery-order', 'order-' + order.id);
+      else soundManager.play('table-order', 'order-' + order.id);
+      setRefreshTrigger((p) => p + 1);
+      if (viewRef.current !== 'orders') setOrderBadge((p) => p + 1);
+      const label = order?.table_id ? `Table ${order.table_id}` : (order?.order_type === 'delivery' ? 'Delivery' : 'Takeaway');
+      pushToast(`New order — ${label}`, 'info');
+    });
+    socket.on('orderStatusUpdated', () => setRefreshTrigger((p) => p + 1));
+    socket.on('orderUpdated', () => setRefreshTrigger((p) => p + 1));
+    socket.on('orderDeleted', () => setRefreshTrigger((p) => p + 1));
+    socket.on('tableCleared', () => setRefreshTrigger((p) => p + 1));
+    socket.on('tableOccupied', () => setRefreshTrigger((p) => p + 1));
+    socket.on('tableStatusUpdate', () => setRefreshTrigger((p) => p + 1));
+    socket.on('orderAlert', (alert) => {
+      soundManager.play('kitchen-alarm', 'alert-' + alert.orderId);
+      pushToast(alert.body || 'An order is running late in the kitchen', 'warning');
+    });
+    socket.on('tableCall', (call) => {
+      soundManager.play('table-order', 'call-' + (call?.id || Date.now()));
+      if (viewRef.current !== 'calls') setCallBadge((p) => p + 1);
+      pushToast(`Table ${call?.table_id || ''} is calling reception`, 'warning');
+    });
+
+    return () => {
+      try { socket.removeAllListeners(); socket.close(); } catch (_) {}
+    };
+  }, [auth.ok, pushToast]);
+
+  // Polling fallback so the board still converges while the socket is down
+  useEffect(() => {
+    if (!auth.ok) return;
+    const t = setInterval(() => setRefreshTrigger((p) => p + 1), 45000);
+    return () => clearInterval(t);
   }, [auth.ok]);
 
   // ---- cart ops ----
@@ -190,7 +259,7 @@ const POS = () => {
         localStorage.setItem('staffAuthenticated', 'true');
         setAuth(getAuthState());
       } else if (data.success) {
-        setLoginError(`Role "${data.user?.role}" cannot use the POS. Ask a Manager or Cashier.`);
+        setLoginError(`Role "${data.user?.role}" cannot use the POS. Ask a Manager or Receptionist.`);
       } else {
         setLoginError(data.message || 'Login failed');
       }
@@ -200,6 +269,20 @@ const POS = () => {
       setLoggingIn(false);
     }
   };
+
+  const switchView = (v) => {
+    setView(v);
+    if (v === 'orders') setOrderBadge(0);
+    if (v === 'calls') setCallBadge(0);
+  };
+
+  const TABS = [
+    { id: 'sell', label: 'Sell', emoji: '🧾' },
+    { id: 'orders', label: 'Orders', emoji: '📋', badge: orderBadge },
+    { id: 'tables', label: 'Tables', emoji: '🪑' },
+    { id: 'calls', label: 'Calls', emoji: '🔔', badge: callBadge },
+    { id: 'verify', label: 'Verify', emoji: '🧾' },
+  ];
 
   // ---- render ----
   if (!auth.ok) {
@@ -211,7 +294,7 @@ const POS = () => {
               <ReceiptIcon size={26} />
             </div>
             <h1 className="text-[20px] font-extrabold text-slate-900">Point of Sale</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Sign in as Manager or Cashier</p>
+            <p className="text-[13px] text-slate-500 mt-0.5">Sign in as Manager or Receptionist</p>
           </div>
           <div className="space-y-2.5">
             <div>
@@ -260,7 +343,7 @@ const POS = () => {
             <ReceiptIcon size={17} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-[15px] font-bold leading-tight truncate">Point of Sale</h1>
+            <h1 className="text-[15px] font-bold leading-tight truncate">Food Zone POS</h1>
             <p className="text-[11px] text-slate-400 leading-tight truncate">{auth.user}</p>
           </div>
         </div>
@@ -284,18 +367,49 @@ const POS = () => {
             <BookIcon size={15} />
             <span className="hidden sm:inline">Daybook</span>
           </button>
-          <a
-            href="/reception"
-            className="h-10 px-3 flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[12.5px] font-semibold text-slate-200 transition-colors"
-          >
-            <DeskIcon size={15} />
-            <span className="hidden sm:inline">Reception</span>
-          </a>
         </div>
       </header>
 
-      {/* Success toast */}
-      {lastSale && (
+      {/* Tab bar */}
+      <nav className="bg-slate-900 border-t border-slate-800 px-2 flex flex-shrink-0 overflow-x-auto no-scrollbar" aria-label="POS sections">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => switchView(t.id)}
+            aria-current={view === t.id ? 'page' : undefined}
+            className={`relative h-11 px-4 flex items-center gap-1.5 text-[13px] font-bold whitespace-nowrap transition-colors border-b-2 ${
+              view === t.id
+                ? 'text-emerald-300 border-emerald-400'
+                : 'text-slate-400 border-transparent hover:text-white'
+            }`}
+          >
+            <span aria-hidden="true">{t.emoji}</span>
+            {t.label}
+            {t.badge > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {t.badge > 9 ? '9+' : t.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Toasts */}
+      <div className="fixed top-16 right-4 z-[60] space-y-2 max-w-xs" aria-live="polite">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`px-3.5 py-2.5 rounded-xl shadow-lg text-[13px] font-semibold text-white ${
+              t.type === 'error' ? 'bg-red-600' : t.type === 'warning' ? 'bg-amber-600' : t.type === 'info' ? 'bg-blue-600' : 'bg-emerald-600'
+            }`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
+
+      {/* Success banner after a sale */}
+      {lastSale && view === 'sell' && (
         <div role="status" className="bg-emerald-600 text-white text-[13px] px-4 py-2 flex items-center justify-between flex-shrink-0">
           <span className="flex items-center gap-2">
             <CheckIcon size={15} />
@@ -307,36 +421,68 @@ const POS = () => {
         </div>
       )}
 
-      {/* Main layout: side-by-side on desktop, natural page flow on small screens */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden">
-        <div className="flex-1 min-w-0 lg:overflow-hidden">
-          {loadingMenu ? (
-            <div className="h-full min-h-[160px] flex items-center justify-center text-slate-400">Loading menu…</div>
-          ) : (
-            <POSItemGrid menuItems={menuItems} onAddItem={addItem} currency={currency} />
-          )}
+      {/* Content */}
+      {view === 'sell' && (
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden">
+          <div className="flex-1 min-w-0 lg:overflow-hidden">
+            {loadingMenu ? (
+              <div className="h-full min-h-[160px] flex items-center justify-center text-slate-400">Loading menu…</div>
+            ) : (
+              <POSItemGrid menuItems={menuItems} onAddItem={addItem} currency={currency} />
+            )}
+          </div>
+          <div className="w-full lg:w-[380px] flex-shrink-0 min-h-0 lg:overflow-hidden">
+            <POSCart
+              cart={cart}
+              onChangeQty={changeQty}
+              onRemoveItem={removeItem}
+              onClearCart={() => setCart([])}
+              orderType={orderType}
+              onOrderTypeChange={setOrderType}
+              orderMeta={orderMeta}
+              onOrderMetaChange={setOrderMeta}
+              discount={discount}
+              discountMode={discountMode}
+              onDiscountChange={setDiscount}
+              onDiscountModeChange={setDiscountMode}
+              totals={totals}
+              onCheckout={handleCheckout}
+              processing={processing}
+              currency={currency}
+            />
+          </div>
         </div>
-        <div className="w-full lg:w-[380px] flex-shrink-0 min-h-0 lg:overflow-hidden">
-          <POSCart
-            cart={cart}
-            onChangeQty={changeQty}
-            onRemoveItem={removeItem}
-            onClearCart={() => setCart([])}
-            orderType={orderType}
-            onOrderTypeChange={setOrderType}
-            orderMeta={orderMeta}
-            onOrderMetaChange={setOrderMeta}
-            discount={discount}
-            discountMode={discountMode}
-            onDiscountChange={setDiscount}
-            onDiscountModeChange={setDiscountMode}
-            totals={totals}
-            onCheckout={handleCheckout}
-            processing={processing}
+      )}
+
+      {view === 'orders' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PosOrdersTab
+            refreshTrigger={refreshTrigger}
+            onRefresh={() => setRefreshTrigger((p) => p + 1)}
+            menuItems={menuItems}
             currency={currency}
+            onToast={pushToast}
           />
         </div>
-      </div>
+      )}
+
+      {view === 'tables' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PosTablesTab refreshTrigger={refreshTrigger} currency={currency} onToast={pushToast} />
+        </div>
+      )}
+
+      {view === 'calls' && (
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <TableCallsManager />
+        </div>
+      )}
+
+      {view === 'verify' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PosVerifyTab refreshTrigger={refreshTrigger} currency={currency} onToast={pushToast} />
+        </div>
+      )}
 
       {showPayment && (
         <POSPaymentPanel
