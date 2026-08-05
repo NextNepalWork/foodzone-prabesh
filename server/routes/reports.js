@@ -1001,13 +1001,15 @@ router.post('/expenses', authenticateToken, async (req, res) => {
     if (!category || !amount) {
       return res.status(400).json({ error: 'category and amount are required' });
     }
-    const txDate = expense_date || new Date().toISOString().split('T')[0];
+    // Fall back to CURRENT_DATE (database timezone = restaurant time), not the
+    // Node process's UTC date — they differ between midnight and 05:45 NPT.
+    const txDate = expense_date || null;
     const fullDescription = notes ? `${description || ''}${description ? ' - ' : ''}${notes}` : (description || null);
 
     const result = await query(`
       INSERT INTO daybook_transactions
         (transaction_date, transaction_type, category, amount, description, payment_method, reference, created_by, created_at)
-      VALUES ($1, 'expense', $2, $3, $4, $5, $6, $7, NOW())
+      VALUES (COALESCE($1::date, CURRENT_DATE), 'expense', $2, $3, $4, $5, $6, $7, NOW())
       RETURNING *
     `, [
       txDate, category, Number(amount), fullDescription,

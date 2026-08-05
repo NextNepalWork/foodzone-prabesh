@@ -3790,7 +3790,7 @@ app.get('/api/daybook/recent-transactions', authenticateToken, requireFrontStaff
 
     const result = await query(`
       SELECT id, transaction_date, transaction_type, category, amount, description,
-             order_id, payment_method, reference_id, created_by, created_at
+             order_id, payment_method, reference, created_by, created_at
       FROM daybook_transactions
       ${whereSql}
       ORDER BY created_at DESC

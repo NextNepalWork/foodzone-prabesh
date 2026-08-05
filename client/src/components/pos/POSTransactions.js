@@ -10,10 +10,24 @@ const POSTransactions = ({ open, onClose, isManager, currency = 'Rs.' }) => {
   const [loading, setLoading] = useState(false);
   const [expenseCause, setExpenseCause] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState('');
+  const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const today = new Date().toISOString().split('T')[0];
+  // Local (restaurant) date, not UTC — between midnight and 05:45 Nepal time
+  // toISOString() is still on yesterday's date, which made late-night entries
+  // land on the wrong daybook day (server sales rows use CURRENT_DATE in NPT).
+  const today = new Date().toLocaleDateString('en-CA');
+
+  // Same category list the Admin expense report uses, so entries recorded
+  // here land in the same buckets there.
+  useEffect(() => {
+    if (!open || categories.length > 0) return;
+    fetchApi.get('/api/reports/expense-categories')
+      .then((res) => setCategories(res?.categories || []))
+      .catch((err) => console.error('Failed to load expense categories:', err));
+  }, [open, categories.length]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +51,10 @@ const POSTransactions = ({ open, onClose, isManager, currency = 'Rs.' }) => {
   }, [open, load]);
 
   const addExpense = async () => {
+    if (!expenseCategory) {
+      setMessage('Pick an expense category');
+      return;
+    }
     if (!expenseCause.trim() || !(parseFloat(expenseAmount) > 0)) {
       setMessage('Enter an expense description and amount');
       return;
@@ -44,11 +62,14 @@ const POSTransactions = ({ open, onClose, isManager, currency = 'Rs.' }) => {
     setSaving(true);
     setMessage('');
     try {
-      await fetchApi.post('/api/daybook/transaction', {
-        transaction_type: 'expense',
+      // Same endpoint the Admin expense manager uses — one ledger, so this
+      // entry appears in Admin's daybook and expense reports immediately.
+      await fetchApi.post('/api/reports/expenses', {
+        expense_date: today,
+        category: expenseCategory,
+        description: expenseCause.trim(),
         amount: parseFloat(expenseAmount),
-        description: `Expense: ${expenseCause.trim()}`,
-        date: today,
+        payment_method: 'cash',
       });
       setExpenseCause('');
       setExpenseAmount('');
@@ -104,6 +125,17 @@ const POSTransactions = ({ open, onClose, isManager, currency = 'Rs.' }) => {
               {/* Quick expense */}
               <div className="border border-slate-200 rounded-xl p-3 space-y-2">
                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Record expense</div>
+                <select
+                  value={expenseCategory}
+                  onChange={(e) => setExpenseCategory(e.target.value)}
+                  aria-label="Expense category"
+                  className={`w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white ${expenseCategory ? 'text-slate-900' : 'text-slate-400'}`}
+                >
+                  <option value="">Category…</option>
+                  {categories.map((c) => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   value={expenseCause}

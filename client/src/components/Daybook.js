@@ -15,7 +15,8 @@ import { fetchApi } from '../services/apiService';
      6. Counted cash becomes next day's opening balance.
    ============================================================= */
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+// Local (restaurant) date, not UTC — toISOString() is yesterday until 05:45 NPT
+const todayISO = () => new Date().toLocaleDateString('en-CA');
 
 const npr = (n) => `Rs. ${Number(n || 0).toLocaleString('en-IN', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
