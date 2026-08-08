@@ -2108,10 +2108,13 @@ app.get('/api/settings/happy-hour', async (req, res) => {
   }
 });
 
-app.post('/api/settings/happy-hour', async (req, res) => {
+app.post('/api/settings/happy-hour', authenticateToken, requireStaffRole([STAFF_ROLES.MANAGER, STAFF_ROLES.CASHIER]), async (req, res) => {
   try {
     const { enabled } = req.body;
-    
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be true or false' });
+    }
+
     // Update both keys for backwards compatibility
     await query(`
       INSERT INTO restaurant_settings (setting_key, setting_value, description)
